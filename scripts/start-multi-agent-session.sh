@@ -20,6 +20,16 @@ readonly FLYWHEEL_DIR="$AGENT_FLYWHEEL_ROOT"  # For backward compatibility, use 
 readonly REQUIRED_MAIL_SCRIPTS=("agent-mail-helper.sh" "mail-monitor-ctl.sh" "monitor-agent-mail-to-terminal.sh" "hook-bypass.sh")
 readonly REQUIRED_MAIL_DIRS=("lib")
 
+# Flags
+CLEANUP_DETACHED=true
+for arg in "$@"; do
+    case "$arg" in
+        --no-cleanup)
+            CLEANUP_DETACHED=false
+            ;;
+    esac
+done
+
 # Colors for output
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -253,30 +263,60 @@ check_dependencies
 
 # Check for detached sessions and offer to clean them up
 check_detached_sessions() {
+    local project_path="$1"
     local detached_sessions=()
+    local detached_paths=()
 
     while IFS= read -r line; do
         local session_name=$(echo "$line" | cut -d: -f1)
         local attached=$(echo "$line" | cut -d: -f2)
         if [ "$attached" = "0" ]; then
             detached_sessions+=("$session_name")
+            local session_path
+            session_path=$(tmux list-panes -t "$session_name" -F "#{pane_current_path}" 2>/dev/null | head -n 1)
+            session_path=${session_path:-"(unknown)"}
+            detached_paths+=("$session_path")
         fi
     done < <(tmux list-sessions -F "#{session_name}:#{session_attached}" 2>/dev/null || true)
 
     if [ ${#detached_sessions[@]} -gt 0 ]; then
         echo -e "${YELLOW}Found ${#detached_sessions[@]} detached session(s):${NC}"
-        for session in "${detached_sessions[@]}"; do
+        for i in "${!detached_sessions[@]}"; do
+            local session="${detached_sessions[$i]}"
             local pane_count=$(tmux list-panes -t "$session" 2>/dev/null | wc -l | tr -d ' ')
-            echo -e "  - $session ($pane_count panes)"
+            local session_path="${detached_paths[$i]}"
+            echo -e "  - $session ($pane_count panes) [$session_path]"
         done
         echo ""
 
-        echo -en "${YELLOW}Kill all detached sessions? [Y/n]:${NC} "
+        local candidate_sessions=()
+        local skipped_count=0
+        for i in "${!detached_sessions[@]}"; do
+            local session="${detached_sessions[$i]}"
+            local session_path="${detached_paths[$i]}"
+            if [ -n "$project_path" ] && [[ "$session_path" == "$project_path"* ]]; then
+                candidate_sessions+=("$session")
+            else
+                skipped_count=$((skipped_count + 1))
+            fi
+        done
+
+        if [ ${#candidate_sessions[@]} -eq 0 ]; then
+            echo -e "${YELLOW}No detached sessions match project path: ${project_path}${NC}"
+            echo ""
+            return
+        fi
+
+        if [ "$skipped_count" -gt 0 ]; then
+            echo -e "${YELLOW}Skipping $skipped_count detached session(s) outside this project.${NC}"
+        fi
+
+        echo -en "${YELLOW}Kill detached sessions for this project? [y/N]:${NC} "
         read kill_response || kill_response=""
-        kill_response=${kill_response:-Y}
+        kill_response=${kill_response:-N}
 
         if [[ "$kill_response" =~ ^[Yy] ]]; then
-            for session in "${detached_sessions[@]}"; do
+            for session in "${candidate_sessions[@]}"; do
                 echo -e "${BLUE}Killing session: $session${NC}"
                 tmux kill-session -t "$session" 2>&1 || true
                 log "Killed detached session: $session"
@@ -289,8 +329,6 @@ check_detached_sessions() {
         fi
     fi
 }
-
-check_detached_sessions
 
 echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║     Multi-Agent Tmux Session Creator (FIXED)                   ║${NC}"
@@ -392,6 +430,26 @@ while true; do
     fi
 done
 
+# Shared task list configuration (after session name is set)
+TASK_LIST_ID=""
+echo ""
+echo -e "${BLUE}Shared Task List:${NC}"
+echo -en "${YELLOW}Enable shared task list for all agents? [Y/n]:${NC} "
+read ENABLE_SHARED_TASKS || ENABLE_SHARED_TASKS=""
+ENABLE_SHARED_TASKS=${ENABLE_SHARED_TASKS:-Y}
+
+if [[ "$ENABLE_SHARED_TASKS" =~ ^[Yy] ]]; then
+    echo -en "${YELLOW}Task list ID [default: ${SESSION_SAFE}-tasks]:${NC} "
+    read TASK_LIST_ID || TASK_LIST_ID=""
+    TASK_LIST_ID=${TASK_LIST_ID:-"${SESSION_SAFE}-tasks"}
+    echo -e "${GREEN}✓ Shared task list enabled: $TASK_LIST_ID${NC}"
+    log "Shared task list enabled: $TASK_LIST_ID"
+else
+    echo -e "${BLUE}Each agent will have its own task list${NC}"
+    log "Shared task list disabled"
+fi
+echo ""
+
 # Prompt for project path (no directory scanning - fully portable)
 echo ""
 echo -e "${BLUE}Project Directory:${NC}"
@@ -423,6 +481,13 @@ else
     fi
     echo -e "${GREEN}Using: ${PROJECT_PATH/#$HOME/\~}${NC}"
     log "Using project path: $PROJECT_PATH"
+fi
+
+if [ "$CLEANUP_DETACHED" = true ]; then
+    check_detached_sessions "$PROJECT_PATH"
+else
+    echo -e "${YELLOW}Skipping detached session cleanup (--no-cleanup)${NC}"
+    log "Skipped detached session cleanup (--no-cleanup)"
 fi
 
 # Source shared project configuration if available (after PROJECT_PATH is set)
@@ -575,7 +640,11 @@ for ((i=0; i<CLAUDE_COUNT; i++)); do
     # Set custom tmux variables for labels (1-indexed for display)
     tmux set -p -t "$PANE" @llm_name "Claude $((i+1))"
     # Export PROJECT_ROOT and MAIL_PROJECT_KEY to agent environment
-    tmux send-keys -t "$PANE" "export PROJECT_ROOT='$PROJECT_PATH' MAIL_PROJECT_KEY='$PROJECT_PATH' && claude --dangerously-skip-permissions" C-m
+    EXPORT_CMD="export PROJECT_ROOT='$PROJECT_PATH' MAIL_PROJECT_KEY='$PROJECT_PATH'"
+    if [ -n "$TASK_LIST_ID" ]; then
+        EXPORT_CMD="$EXPORT_CMD CLAUDE_CODE_TASK_LIST_ID='$TASK_LIST_ID'"
+    fi
+    tmux send-keys -t "$PANE" "$EXPORT_CMD && claude --dangerously-skip-permissions" C-m
     log "Started Claude agent $((i+1)) in pane $PANE_NUM"
 done
 
