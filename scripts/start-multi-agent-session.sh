@@ -285,17 +285,19 @@ check_detached_sessions() {
             local session="${detached_sessions[$i]}"
             local pane_count=$(tmux list-panes -t "$session" 2>/dev/null | wc -l | tr -d ' ')
             local session_path="${detached_paths[$i]}"
-            echo -e "  - $session ($pane_count panes) [$session_path]"
+            echo -e "  $((i+1)). $session ($pane_count panes) [$session_path]"
         done
         echo ""
 
         local candidate_sessions=()
+        local candidate_paths=()
         local skipped_count=0
         for i in "${!detached_sessions[@]}"; do
             local session="${detached_sessions[$i]}"
             local session_path="${detached_paths[$i]}"
             if [ -n "$project_path" ] && [[ "$session_path" == "$project_path"* ]]; then
                 candidate_sessions+=("$session")
+                candidate_paths+=("$session_path")
             else
                 skipped_count=$((skipped_count + 1))
             fi
@@ -311,22 +313,104 @@ check_detached_sessions() {
             echo -e "${YELLOW}Skipping $skipped_count detached session(s) outside this project.${NC}"
         fi
 
-        echo -en "${YELLOW}Kill detached sessions for this project? [y/N]:${NC} "
-        read kill_response || kill_response=""
-        kill_response=${kill_response:-N}
+        local prompt
+        prompt="${YELLOW}Choose: [K]ill [numbers] | [A]ttach [numbers] | [Ka] kill all | [S]kip all:${NC} "
+        while true; do
+            echo -en "$prompt"
+            read action || action=""
+            action="$(echo "$action" | tr '[:upper:]' '[:lower:]' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
 
-        if [[ "$kill_response" =~ ^[Yy] ]]; then
-            for session in "${candidate_sessions[@]}"; do
-                echo -e "${BLUE}Killing session: $session${NC}"
-                tmux kill-session -t "$session" 2>&1 || true
-                log "Killed detached session: $session"
+            if [ -z "$action" ] || [ "$action" = "s" ] || [ "$action" = "skip" ] || [ "$action" = "skip all" ]; then
+                echo -e "${YELLOW}Keeping detached sessions${NC}"
+                echo ""
+                return
+            fi
+
+            if [ "$action" = "ka" ] || [ "$action" = "kill all" ] || [ "$action" = "k all" ]; then
+                if [ ${#candidate_sessions[@]} -gt 5 ]; then
+                    echo -en "${YELLOW}Kill ${#candidate_sessions[@]} sessions? [y/N]:${NC} "
+                    read confirm || confirm=""
+                    confirm=${confirm:-N}
+                    [[ "$confirm" =~ ^[Yy]$ ]] || return
+                fi
+                for session in "${candidate_sessions[@]}"; do
+                    echo -e "${BLUE}Killing session: $session${NC}"
+                    tmux kill-session -t "$session" 2>&1 || true
+                    log "Killed detached session: $session"
+                done
+                echo -e "${GREEN}✓ Detached sessions cleaned up${NC}"
+                echo ""
+                return
+            fi
+
+            local mode=""
+            local rest="$action"
+            if [[ "$action" =~ ^k[[:space:]]+ ]]; then
+                mode="kill"
+                rest="${action#k }"
+            elif [[ "$action" =~ ^a[[:space:]]+ ]]; then
+                mode="attach"
+                rest="${action#a }"
+            fi
+
+            if [ -z "$mode" ]; then
+                mode="kill"
+                rest="$action"
+            fi
+
+            rest="${rest//,/ }"
+            local indexes=()
+            for token in $rest; do
+                if [[ "$token" =~ ^[0-9]+$ ]]; then
+                    indexes+=("$token")
+                fi
             done
-            echo -e "${GREEN}✓ Detached sessions cleaned up${NC}"
-            echo ""
-        else
-            echo -e "${YELLOW}Keeping detached sessions${NC}"
-            echo ""
-        fi
+
+            if [ ${#indexes[@]} -eq 0 ]; then
+                echo -e "${YELLOW}Invalid selection. Example: 'k 1,3' or 'a 2' or 'ka'.${NC}"
+                continue
+            fi
+
+            if [ "$mode" = "attach" ]; then
+                local first_index="${indexes[0]}"
+                local idx=$((first_index - 1))
+                if [ "$idx" -lt 0 ] || [ "$idx" -ge ${#candidate_sessions[@]} ]; then
+                    echo -e "${YELLOW}Invalid session number: $first_index${NC}"
+                    continue
+                fi
+                local session="${candidate_sessions[$idx]}"
+                echo -e "${GREEN}Attaching to session: $session${NC}"
+                if [ -n "$TMUX" ]; then
+                    tmux switch-client -t "$session"
+                else
+                    exec tmux attach -t "$session"
+                fi
+                return
+            fi
+
+            if [ "$mode" = "kill" ]; then
+                if [ ${#indexes[@]} -gt 5 ]; then
+                    echo -en "${YELLOW}Kill ${#indexes[@]} sessions? [y/N]:${NC} "
+                    read confirm || confirm=""
+                    confirm=${confirm:-N}
+                    [[ "$confirm" =~ ^[Yy]$ ]] || return
+                fi
+                for sel in "${indexes[@]}"; do
+                    local idx=$((sel - 1))
+                    if [ "$idx" -lt 0 ] || [ "$idx" -ge ${#candidate_sessions[@]} ]; then
+                        echo -e "${YELLOW}Invalid session number: $sel${NC}"
+                        continue
+                    fi
+                    local session="${candidate_sessions[$idx]}"
+                    echo -e "${BLUE}Killing session: $session${NC}"
+                    tmux kill-session -t "$session" 2>&1 || true
+                    log "Killed detached session: $session"
+                done
+                echo -e "${GREEN}✓ Detached sessions cleaned up${NC}"
+                echo ""
+                return
+            fi
+        done
     fi
 }
 
