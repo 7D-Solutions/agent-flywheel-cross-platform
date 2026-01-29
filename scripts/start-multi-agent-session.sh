@@ -569,6 +569,9 @@ else
     log "Using project path: $PROJECT_PATH"
 fi
 
+# Remove trailing slash from PROJECT_PATH to avoid double slashes
+PROJECT_PATH="${PROJECT_PATH%/}"
+
 if [ "$CLEANUP_DETACHED" = true ]; then
     check_detached_sessions
 else
