@@ -1,0 +1,16 @@
+.DS_Store
+*.log
+
+# Runtime/state
+.active-agents/
+.agent-coordination/
+.agent-workflows/
+.ntm/
+archive/
+panes/
+pids/
+state/
+workflows/
+
+# Local configs
+.tmux.conf.agent-flywheel
