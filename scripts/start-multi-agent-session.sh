@@ -12,7 +12,7 @@ readonly AGENT_FLYWHEEL_ROOT="$(dirname "$SCRIPT_DIR")"
 # Configuration Constants
 readonly MAX_AGENTS_WARNING=10
 readonly HISTORY_LIMIT=50000
-readonly AGENT_INIT_WAIT=5
+readonly AGENT_INIT_WAIT=10
 readonly MONITOR_START_WAIT=1
 readonly LOG_DIR="$HOME/.agent-flywheel"
 readonly LOG_FILE="$LOG_DIR/session-creation.log"
