@@ -65,11 +65,14 @@ cd /path/to/agent-flywheel-cross-platform
 ./scripts/start-multi-agent-session.sh
 ```
 
+**Important:** When prompted for the project path, choose the **project root** (not the `scripts/` folder).
+
 **No more `.fixed.v4.8` needed!** This cross-platform version works out of the box on WSL.
 
 ## Notes
 - If mail seems missing, make sure the Mail server is running (`docker ps`).
 - If hooks block commands in a new project, confirm `directory-restriction.py` allows your project directory.
+- tmux runs **inside WSL** (not native Windows). Use Windows Terminal for the best experience.
 - For tmux usage: `Ctrl+b` then `d` to detach, `tmux ls` to list sessions.
 
 ## What's Fixed in This Cross-Platform Version
@@ -94,6 +97,12 @@ This version includes three critical fixes for WSL compatibility:
 # Ensure ~/.local/bin is in PATH
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+```
+
+### Auto-registration fails (no agent names)
+Ensure `python3` is installed and on PATH (required for name generation):
+```bash
+python3 --version
 ```
 
 ### Docker not accessible

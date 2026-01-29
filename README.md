@@ -87,6 +87,8 @@ The script will:
 - Set up agent communication infrastructure
 - Launch your configured agents
 
+**Important:** When asked for the project path, choose the **project root**.
+
 ### 4. Navigate the Session
 
 Inside tmux:
@@ -120,7 +122,8 @@ See [AGENT_MAIL.md](./AGENT_MAIL.md) for commands to send messages between agent
 ### Linux/WSL
 - Python packages install to `~/.local/bin`
 - Uses `bash` by default (can detect zsh)
-- Make sure Windows Terminal is set up for best WSL experience
+- tmux is available **inside WSL** (not native Windows)
+- Use Windows Terminal for the best WSL + tmux experience
 - WSL-specific setup guide: [README-SETUP-WSL.md](./README-SETUP-WSL.md)
 
 ## File Structure
@@ -173,6 +176,12 @@ tmux attach -t flywheel
 # Make sure ~/.local/bin is in PATH
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
+```
+
+### Auto-registration fails (no agent names)
+Ensure `python3` is installed and on PATH (required for name generation):
+```bash
+python3 --version
 ```
 
 ### WSL-specific issues
