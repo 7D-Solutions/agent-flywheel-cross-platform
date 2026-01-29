@@ -244,7 +244,9 @@ update_claude_md_reference() {
             echo -e "${YELLOW}⚠️  CLAUDE.md already references AGENT_MAIL.md${NC}"
         else
             # Ensure file ends with newline
-            [ -s "$claude_md" ] && [ "$(tail -c1 "$claude_md" 2>/dev/null | wc -l)" -eq 0 ] && echo "" >> "$claude_md"
+            if [ -s "$claude_md" ] && [ "$(tail -c1 "$claude_md" 2>/dev/null | wc -l)" -eq 0 ]; then
+                echo "" >> "$claude_md"
+            fi
             echo "$ref_text" >> "$claude_md"
             echo -e "${GREEN}✓ Added reference to CLAUDE.md${NC}"
         fi
