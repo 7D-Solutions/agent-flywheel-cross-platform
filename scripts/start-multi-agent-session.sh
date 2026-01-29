@@ -263,7 +263,6 @@ check_dependencies
 
 # Check for detached sessions and offer to clean them up
 check_detached_sessions() {
-    local project_path="$1"
     local detached_sessions=()
     local detached_paths=()
 
@@ -289,29 +288,9 @@ check_detached_sessions() {
         done
         echo ""
 
-        local candidate_sessions=()
-        local candidate_paths=()
-        local skipped_count=0
-        for i in "${!detached_sessions[@]}"; do
-            local session="${detached_sessions[$i]}"
-            local session_path="${detached_paths[$i]}"
-            if [ -n "$project_path" ] && [[ "$session_path" == "$project_path"* ]]; then
-                candidate_sessions+=("$session")
-                candidate_paths+=("$session_path")
-            else
-                skipped_count=$((skipped_count + 1))
-            fi
-        done
-
-        if [ ${#candidate_sessions[@]} -eq 0 ]; then
-            echo -e "${YELLOW}No detached sessions match project path: ${project_path}${NC}"
-            echo ""
-            return
-        fi
-
-        if [ "$skipped_count" -gt 0 ]; then
-            echo -e "${YELLOW}Skipping $skipped_count detached session(s) outside this project.${NC}"
-        fi
+        # All detached sessions are candidates (no project filtering)
+        local candidate_sessions=("${detached_sessions[@]}")
+        local candidate_paths=("${detached_paths[@]}")
 
         local prompt
         prompt="${YELLOW}Choose: [K]ill [numbers] | [A]ttach [numbers] | [Ka] kill all | [S]kip all:${NC} "
@@ -568,7 +547,7 @@ else
 fi
 
 if [ "$CLEANUP_DETACHED" = true ]; then
-    check_detached_sessions "$PROJECT_PATH"
+    check_detached_sessions
 else
     echo -e "${YELLOW}Skipping detached session cleanup (--no-cleanup)${NC}"
     log "Skipped detached session cleanup (--no-cleanup)"
