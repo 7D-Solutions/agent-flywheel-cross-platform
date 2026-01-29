@@ -86,7 +86,15 @@ generate_candidate_name() {
         log "  Set MCP_AGENT_MAIL_DIR or install mcp_agent_mail to enable name generation."
         return 1
     fi
-    PYTHONPATH="$MCP_AGENT_MAIL_DIR/src" python - <<'PY'
+    local python_bin="python"
+    if ! command -v "$python_bin" >/dev/null 2>&1; then
+        python_bin="python3"
+    fi
+    if ! command -v "$python_bin" >/dev/null 2>&1; then
+        log "✗ Python not found (need python or python3 for name generation)"
+        return 1
+    fi
+    PYTHONPATH="$MCP_AGENT_MAIL_DIR/src" "$python_bin" - <<'PY'
 from mcp_agent_mail.utils import generate_agent_name
 print(generate_agent_name())
 PY
