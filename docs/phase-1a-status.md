@@ -44,29 +44,31 @@
 
 ## 🔄 In Progress
 
-*(None — Phase 1A tasks are complete.)*
-
----
-
-## ✅ Newly Completed
-
-### Task 3: Add Pre-Edit Checks
-- **Owner:** OrangeFalcon
-- **Status:** Complete ✅
-- **Deliverables:** `scripts/pre-edit-check.sh` (lightweight wrapper) + pre-edit section in `docs/file-reservation-usage.md`
-- **Notes:** Respects `BYPASS_RESERVATION`; exits 0/1/2 for available/conflict/error.
-
 ### Task 5: Document Final Workflow
-- **Owner:** IndigoBeaver
-- **Status:** Complete ✅
-- **Deliverable:** `docs/file-reservation-workflow.md` (practical, scenario-driven guide)
-- **Notes:** Covers pre-edit checks, reserve/edit/release flow, mail coordination, TTL renew, bypass guidance, edge cases.
+- **Status:** Ready to start (depends on Task 4 completion ✅)
+- **Goal:** Document what actually works based on real testing
+- **Next step:** Create workflow guide based on empirical results from all 7 tests
 
 ---
 
 ## 📋 Next Tasks (Phase 1A)
 
-*(All Phase 1A tasks are complete. Move to Phase 1B/Phase 2 planning.)*
+### Task 3: Add Pre-Edit Checks
+- **Status:** Not started
+- **Suggested owner:** OrangeFalcon (has governance expertise)
+- **Goal:** Create pre-edit check script that validates against governance rules
+- **Deliverable:** Script that checks reservations before file edits
+
+### Task 5: Document Final Workflow
+- **Status:** Ready to start (Task 4 complete ✅)
+- **Suggested owner:** IndigoBeaver or OrangeFalcon
+- **Goal:** Document what actually works based on real testing
+- **Deliverable:** Workflow guide based on empirical results from all 7 tests
+- **Content needed:**
+  - Common workflows (pre-edit checks, conflict resolution)
+  - Best practices learned from testing
+  - Edge cases and how to handle them
+  - Integration patterns for agent coordination
 
 ---
 
@@ -81,15 +83,13 @@
 
 ---
 
-## 📁 Files Created / Updated
+## 📁 Files Created
 
 ### Scripts
 - `/scripts/reserve-files.sh` - Main reservation tool
-- `/scripts/pre-edit-check.sh` - Pre-edit availability wrapper (Task 3)
 
 ### Documentation
-- `/docs/file-reservation-usage.md` - Usage guide (now includes pre-edit checks)
-- `/docs/file-reservation-workflow.md` - Practical workflow guide (Task 5)
+- `/docs/file-reservation-usage.md` - Complete usage guide
 - `/docs/phase-1a-status.md` - This file
 - `/testing/reservation-test-plan.md` - Test scenarios (7 tests)
 
