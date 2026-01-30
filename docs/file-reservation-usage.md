@@ -158,12 +158,78 @@ BYPASS_RESERVATION=1 ./scripts/reserve-files.sh check 'src/**'
 
 ---
 
+## Pre-Edit Checks
+
+**Phase 1A Task 3:** Lightweight pre-edit check script to verify files are available before editing.
+
+### Quick Usage
+```bash
+# Before editing any files, run pre-edit check
+./scripts/pre-edit-check.sh 'src/module.py'
+
+# If check passes (exit 0), proceed with reservation
+./scripts/reserve-files.sh reserve 'src/module.py'
+# ... make edits ...
+./scripts/reserve-files.sh release
+```
+
+### Pre-Edit Check Script
+The `scripts/pre-edit-check.sh` wrapper provides a simple governance check:
+
+```bash
+./scripts/pre-edit-check.sh <file-patterns...>
+```
+
+**Exit codes:**
+- `0` - Files available, safe to proceed
+- `1` - Files reserved by another agent (logs holder names)
+- `2` - Error (missing arguments, invalid usage)
+
+**Features:**
+- Runs `reserve-files.sh check` internally
+- Logs conflict details including agent names
+- Respects `BYPASS_RESERVATION=1`
+- Provides clear next-step guidance on conflicts
+
+### tmux Integration
+
+**Before editing files in tmux:**
+```bash
+# Run pre-edit check first
+./scripts/pre-edit-check.sh 'docs/**'
+
+# Only proceed if check passes (exit code 0)
+# Then reserve, edit, and release
+```
+
+**Example conflict scenario:**
+```bash
+# Agent A reserves files
+./scripts/reserve-files.sh reserve 'src/app.py'
+
+# Agent B runs pre-edit check (in different pane)
+./scripts/pre-edit-check.sh 'src/app.py'
+# Output shows: held by AgentA
+# Exit code: 1 (conflict)
+
+# Agent B coordinates via mail or waits
+```
+
+### Bypass Mode
+For testing or emergencies:
+```bash
+BYPASS_RESERVATION=1 ./scripts/pre-edit-check.sh 'src/**'
+# Always returns 0 (bypassed)
+```
+
+---
+
 ## Workflow Integration
 
 ### Pre-Edit Workflow
 ```bash
-# 1. Check availability
-if ! ./scripts/reserve-files.sh check 'src/module.py'; then
+# 1. Run pre-edit check
+if ! ./scripts/pre-edit-check.sh 'src/module.py'; then
     echo "Files are in use, coordinate with other agent"
     exit 1
 fi
