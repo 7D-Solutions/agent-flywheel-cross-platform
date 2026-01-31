@@ -251,45 +251,232 @@ EOF
 log "=== Session creation started ==="
 check_dependencies
 
-# Check for detached sessions and offer to clean them up
-check_detached_sessions() {
-    local detached_sessions=()
+# Manage existing sessions (attach, kill, or create new)
+manage_existing_sessions() {
+    local sessions=()
+    local session_info=()
 
+    # Get all tmux sessions
     while IFS= read -r line; do
-        local session_name=$(echo "$line" | cut -d: -f1)
-        local attached=$(echo "$line" | cut -d: -f2)
-        if [ "$attached" = "0" ]; then
-            detached_sessions+=("$session_name")
+        if [ -n "$line" ]; then
+            local session_name=$(echo "$line" | cut -d: -f1)
+            local attached=$(echo "$line" | cut -d: -f2)
+            local pane_count=$(tmux list-panes -t "$session_name" 2>/dev/null | wc -l | tr -d ' ')
+            local status="detached"
+            [ "$attached" != "0" ] && status="attached"
+
+            sessions+=("$session_name")
+            session_info+=("$session_name|$pane_count|$status")
         fi
     done < <(tmux list-sessions -F "#{session_name}:#{session_attached}" 2>/dev/null || true)
 
-    if [ ${#detached_sessions[@]} -gt 0 ]; then
-        echo -e "${YELLOW}Found ${#detached_sessions[@]} detached session(s):${NC}"
-        for session in "${detached_sessions[@]}"; do
-            local pane_count=$(tmux list-panes -t "$session" 2>/dev/null | wc -l | tr -d ' ')
-            echo -e "  - $session ($pane_count panes)"
-        done
-        echo ""
-        echo -en "${YELLOW}Kill all detached sessions? [Y/n]:${NC} "
-        read kill_response || kill_response=""
-        kill_response=${kill_response:-Y}
-
-        if [[ "$kill_response" =~ ^[Yy] ]]; then
-            for session in "${detached_sessions[@]}"; do
-                echo -e "${BLUE}Killing session: $session${NC}"
-                tmux kill-session -t "$session" 2>&1 || true
-                log "Killed detached session: $session"
-            done
-            echo -e "${GREEN}✓ Detached sessions cleaned up${NC}"
-            echo ""
-        else
-            echo -e "${YELLOW}Keeping detached sessions${NC}"
-            echo ""
-        fi
+    # If no sessions exist, skip this
+    if [ ${#sessions[@]} -eq 0 ]; then
+        return 0
     fi
+
+    # Display existing sessions
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║  Existing Tmux Sessions (Multi-Agent Coding Environments)      ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}💡 You have existing coding sessions. You can:${NC}"
+    echo -e "${YELLOW}   • Attach = Resume working in that session${NC}"
+    echo -e "${YELLOW}   • Kill = Permanently delete that session${NC}"
+    echo ""
+
+    for i in "${!sessions[@]}"; do
+        local info="${session_info[$i]}"
+        local name=$(echo "$info" | cut -d'|' -f1)
+        local panes=$(echo "$info" | cut -d'|' -f2)
+        local status=$(echo "$info" | cut -d'|' -f3)
+
+        local status_color="${YELLOW}"
+        local status_text="not active"
+        if [ "$status" = "attached" ]; then
+            status_color="${GREEN}"
+            status_text="currently active"
+        fi
+
+        echo -e "  ${BLUE}$((i+1)).${NC} ${BOLD}$name${NC} - ${status_color}$status_text${NC}, $panes agent panes"
+    done
+
+    echo ""
+    echo -e "${BLUE}What would you like to do? ${YELLOW}(Type a command and press Enter)${NC}"
+    echo ""
+    echo -e "  ${GREEN}a 1${NC}       - Attach to session #1"
+    echo -e "  ${GREEN}a 1 2 3${NC}   - Attach to sessions #1, #2, #3 (opens each in new tab)"
+    echo -e "  ${GREEN}k 2${NC}       - Kill session #2"
+    echo -e "  ${GREEN}k 1 2 3${NC}   - Kill sessions #1, #2, #3"
+    echo -e "  ${GREEN}k all${NC}     - Kill all sessions"
+    echo -e "  ${GREEN}n${NC}         - Create a new session"
+    echo -e "  ${GREEN}e${NC}         - Exit"
+    echo ""
+    echo -e "${YELLOW}💡 Type the full command (like 'a 1' or 'k 1 2 3'), not just a number!${NC}"
+    echo ""
+    echo -en "${GREEN}Your choice:${NC} "
+    read choice || choice=""
+    choice=$(echo "$choice" | tr '[:upper:]' '[:lower:]' | xargs)
+
+    case "$choice" in
+        a\ *)
+            # Extract all numbers from the command (handles "a 1 2 3" or "a 1,2,3")
+            local nums=$(echo "$choice" | sed 's/^a //' | tr ',' ' ')
+            local num_count=$(echo "$nums" | wc -w)
+
+            # Single session - attach directly
+            if [ "$num_count" -eq 1 ]; then
+                local num=$nums
+                if [ "$num" -ge 1 ] 2>/dev/null && [ "$num" -le "${#sessions[@]}" ]; then
+                    local target_session="${sessions[$((num-1))]}"
+                    echo -e "${GREEN}Attaching to session: $target_session${NC}"
+                    log "User attached to existing session: $target_session"
+
+                    # Don't use exec - just attach normally
+                    tmux attach -t "$target_session"
+
+                    # If we get here, the session exited or user detached
+                    # Automatically return to menu
+                    echo ""
+                    echo -e "${YELLOW}✓ Detached from session (agents still running in background)${NC}"
+                    sleep 1
+                    manage_existing_sessions
+                    return $?
+                else
+                    echo -e "${RED}Invalid session number: $num${NC}"
+                    sleep 1
+                    manage_existing_sessions
+                    return $?
+                fi
+            else
+                # Multiple sessions - open each in new iTerm tab (if in iTerm) or sequentially
+                local TERM_PROGRAM="${TERM_PROGRAM:-Terminal}"
+                local invalid_nums=""
+                local valid_sessions=()
+
+                # Validate all session numbers first
+                for num in $nums; do
+                    if [ "$num" -ge 1 ] 2>/dev/null && [ "$num" -le "${#sessions[@]}" ]; then
+                        valid_sessions+=("${sessions[$((num-1))]}")
+                    else
+                        invalid_nums="$invalid_nums $num"
+                    fi
+                done
+
+                if [ -n "$invalid_nums" ]; then
+                    echo -e "${RED}Invalid session number(s):$invalid_nums${NC}"
+                    sleep 2
+                fi
+
+                if [ "${#valid_sessions[@]}" -eq 0 ]; then
+                    echo -e "${RED}No valid sessions to attach${NC}"
+                    sleep 1
+                    manage_existing_sessions
+                    return $?
+                fi
+
+                # Check if we're in iTerm2
+                if [ "$TERM_PROGRAM" = "iTerm.app" ]; then
+                    echo -e "${GREEN}Opening ${#valid_sessions[@]} sessions in new iTerm tabs...${NC}"
+                    for session in "${valid_sessions[@]}"; do
+                        echo -e "${BLUE}  Opening: $session${NC}"
+                        osascript <<EOF
+tell application "iTerm"
+    tell current window
+        create tab with default profile command "tmux attach -t $session"
+    end tell
+end tell
+EOF
+                        log "Opened session in new tab: $session"
+                    done
+                    echo -e "${GREEN}✓ Sessions opened in new tabs${NC}"
+                    sleep 1
+                else
+                    echo -e "${YELLOW}Multiple session attach only works in iTerm2${NC}"
+                    echo -e "${YELLOW}Attaching to first session only: ${valid_sessions[0]}${NC}"
+                    tmux attach -t "${valid_sessions[0]}"
+                fi
+
+                manage_existing_sessions
+                return $?
+            fi
+            ;;
+
+        k\ *)
+            # Extract all numbers from the command (handles "k 1 2 3" or "k 1,2,3")
+            local nums=$(echo "$choice" | sed 's/^k //' | tr ',' ' ')
+
+            # Handle "k all" specially
+            if [ "$nums" = "all" ]; then
+                echo -e "${YELLOW}Killing all sessions...${NC}"
+                for session in "${sessions[@]}"; do
+                    echo -e "${BLUE}  Killing: $session${NC}"
+                    tmux kill-session -t "$session" 2>&1 || true
+                    log "Killed session: $session"
+                done
+                echo -e "${GREEN}✓ All sessions killed${NC}"
+                echo ""
+                return 0
+            fi
+
+            # Kill multiple sessions
+            local killed_any=false
+            local invalid_nums=""
+            for num in $nums; do
+                if [ "$num" -ge 1 ] 2>/dev/null && [ "$num" -le "${#sessions[@]}" ]; then
+                    local target_session="${sessions[$((num-1))]}"
+                    echo -e "${YELLOW}Killing session #$num: $target_session${NC}"
+                    tmux kill-session -t "$target_session" 2>&1 || true
+                    log "Killed session: $target_session"
+                    killed_any=true
+                else
+                    invalid_nums="$invalid_nums $num"
+                fi
+            done
+
+            if [ "$killed_any" = true ]; then
+                echo -e "${GREEN}✓ Session(s) killed${NC}"
+            fi
+            if [ -n "$invalid_nums" ]; then
+                echo -e "${RED}Invalid session number(s):$invalid_nums${NC}"
+            fi
+            sleep 1
+            manage_existing_sessions
+            return $?
+            ;;
+
+        n|"")
+            return 0
+            ;;
+
+        e)
+            echo -e "${BLUE}Exiting${NC}"
+            exit 0
+            ;;
+
+        *)
+            echo ""
+            echo -e "${RED}❌ Invalid choice: '$choice'${NC}"
+            echo ""
+            echo -e "${YELLOW}💡 You need to type the command, not just a number!${NC}"
+            echo ""
+            echo -e "${GREEN}Try one of these:${NC}"
+            echo "  n         - Create new session"
+            echo "  e         - Exit"
+            echo "  a 1       - Attach to session #1"
+            echo "  a 1 2 3   - Attach to multiple sessions (new tabs)"
+            echo "  k 2       - Kill session #2"
+            echo "  k 1 2 3   - Kill multiple sessions"
+            echo "  k all     - Kill all sessions"
+            echo ""
+            sleep 3
+            manage_existing_sessions
+            return $?
+            ;;
+    esac
 }
 
-check_detached_sessions
+manage_existing_sessions
 
 check_duplicate_agent_names() {
     local phase="$1"
@@ -337,7 +524,8 @@ echo ""
 
 # Prompt for session name (loop until resolved)
 while true; do
-    echo -en "${YELLOW}Session name [default: flywheel]:${NC} "
+    echo -e "${BLUE}Give your multi-agent session a name (or press Enter for 'flywheel'):${NC}"
+    echo -en "${YELLOW}Session name:${NC} "
     read SESSION_NAME || SESSION_NAME=""
     SESSION_NAME=${SESSION_NAME:-flywheel}
     SESSION_SAFE=$(echo "$SESSION_NAME" | tr -cs 'A-Za-z0-9_-' '_' | tr '[:upper:]' '[:lower:]' | sed 's/^_*//;s/_*$//')
@@ -400,7 +588,25 @@ while true; do
                 [Aa])
                     echo -e "${GREEN}Attaching to existing session...${NC}"
                     log "User chose to attach to existing session: $SESSION_SAFE"
-                    exec tmux attach -t "$SESSION_SAFE"
+
+                    # Don't use exec - attach normally so we can handle exits
+                    tmux attach -t "$SESSION_SAFE"
+
+                    # If we return here, session was detached or exited
+                    echo ""
+                    echo -e "${YELLOW}Session detached or exited.${NC}"
+                    echo -e "${BLUE}What would you like to do?${NC}"
+                    echo -e "  ${GREEN}R${NC} - Return to choose/create session"
+                    echo -e "  ${GREEN}E${NC} - Exit"
+                    echo -en "${YELLOW}Choose [R/E]:${NC} "
+                    read post_attach_action || post_attach_action=""
+                    post_attach_action=${post_attach_action:-E}
+
+                    if [[ "$post_attach_action" =~ ^[Rr]$ ]]; then
+                        continue
+                    else
+                        exit 0
+                    fi
                     ;;
                 [Nn])
                     continue
@@ -418,16 +624,36 @@ done
 
 # Prompt for project path (no directory scanning - fully portable)
 echo ""
-echo -e "${BLUE}Project Directory:${NC}"
-echo -en "${YELLOW}Enter project path [press Enter for current directory]:${NC} "
-read PROJECT_PATH || PROJECT_PATH=""
-
-# Use current directory if not specified
-if [ -z "$PROJECT_PATH" ]; then
-    PROJECT_PATH="$(pwd)"
-    echo -e "${GREEN}Using current directory: ${PROJECT_PATH/#$HOME/\~}${NC}"
-    log "Using current directory: $PROJECT_PATH"
+# Check if project path was provided via environment variable (from file picker)
+if [ -n "${SELECTED_PROJECT_PATH:-}" ]; then
+    PROJECT_PATH="$SELECTED_PROJECT_PATH"
+    echo -e "${GREEN}Using selected project: ${PROJECT_PATH/#$HOME/\~}${NC}"
+    log "Using selected project path: $PROJECT_PATH"
 else
+    echo -e "${BLUE}Project Directory:${NC}"
+    echo -e "${BLUE}Tip: Paths with spaces are OK - quotes will be handled automatically${NC}"
+    echo -en "${YELLOW}Enter project path [press Enter for current directory]:${NC} "
+    read PROJECT_PATH || PROJECT_PATH=""
+
+    # Use current directory if not specified
+    if [ -z "$PROJECT_PATH" ]; then
+        PROJECT_PATH="$(pwd)"
+        echo -e "${GREEN}Using current directory: ${PROJECT_PATH/#$HOME/\~}${NC}"
+        log "Using current directory: $PROJECT_PATH"
+    fi
+fi
+
+# Process the path (strip quotes, expand ~, etc.)
+if [ -n "$PROJECT_PATH" ] && [ "$PROJECT_PATH" != "$(pwd)" ]; then
+    # Strip leading/trailing quotes (handles 'path' or "path")
+    PROJECT_PATH="${PROJECT_PATH#\'}"
+    PROJECT_PATH="${PROJECT_PATH%\'}"
+    PROJECT_PATH="${PROJECT_PATH#\"}"
+    PROJECT_PATH="${PROJECT_PATH%\"}"
+
+    # Trim whitespace
+    PROJECT_PATH=$(echo "$PROJECT_PATH" | xargs)
+
     # Expand ~ to home directory
     PROJECT_PATH="${PROJECT_PATH/#\~/$HOME}"
 
@@ -465,12 +691,16 @@ create_agent_mail_docs
 update_claude_md_reference
 
 # Prompt for number of Claude agents
-echo -en "${YELLOW}Number of Claude agents [default: 2]:${NC} "
+echo ""
+echo -e "${BLUE}How many AI coding agents do you want?${NC}"
+echo -e "${YELLOW}💡 Tip: Start with 2 Claude agents if you're not sure${NC}"
+echo ""
+echo -en "${YELLOW}Number of Claude agents (press Enter for 2):${NC} "
 read CLAUDE_COUNT || CLAUDE_COUNT=""
 CLAUDE_COUNT=${CLAUDE_COUNT:-2}
 
 # Prompt for number of Codex agents
-echo -en "${YELLOW}Number of Codex agents [default: 0]:${NC} "
+echo -en "${YELLOW}Number of Codex agents (press Enter for 0):${NC} "
 read CODEX_COUNT || CODEX_COUNT=""
 CODEX_COUNT=${CODEX_COUNT:-0}
 
@@ -753,11 +983,21 @@ if [ -n "$TASK_LIST_ID" ]; then
 fi
 echo "   Log file: $LOG_FILE"
 echo ""
-echo -e "${BLUE}🎮 Navigation:${NC}"
-echo "   Ctrl+b + arrow keys  - Navigate panes"
-echo "   Ctrl+b + q           - Show pane numbers"
-echo "   Ctrl+b + z           - Zoom current pane"
-echo "   Ctrl+b + d           - Detach from session"
+echo -e "${BLUE}🎮 Tmux Keyboard Shortcuts (for beginners):${NC}"
+echo ""
+echo -e "  ${GREEN}Essential:${NC}"
+echo "   Ctrl+b, then arrow keys  - Switch between panes"
+echo "   Ctrl+b, then d           - Detach (exit without closing)"
+echo ""
+echo -e "  ${GREEN}Helpful:${NC}"
+echo "   Ctrl+b, then q           - Show pane numbers"
+echo "   Ctrl+b, then z           - Zoom current pane (toggle fullscreen)"
+echo "   Ctrl+b, then x           - Close current pane (asks for confirmation)"
+echo ""
+echo -e "  ${GREEN}To reattach later:${NC}"
+echo "   tmux attach -t $SESSION_NAME"
+echo ""
+echo -e "${YELLOW}💡 Tip: Press Ctrl+b, release, THEN press the next key${NC}"
 echo ""
 echo -e "${GREEN}Attaching to session...${NC}"
 
@@ -782,8 +1022,8 @@ if [ -n "$TMUX" ]; then
 else
     # Not in tmux, safe to attach
     echo -e "${GREEN}Attaching to session...${NC}"
-    echo -e "${YELLOW}Use 'Ctrl+b, then d' to detach later${NC}"
+    echo -e "${YELLOW}💡 Remember: Press 'Ctrl+b' first, release, then press 'd' to detach${NC}"
     log "Session creation complete - attaching"
-    sleep 1
+    sleep 2
     exec tmux attach -t "$SESSION_SAFE"
 fi

@@ -144,7 +144,39 @@ if [[ ":$PATH:" != *":$PYTHON_BIN:"* ]]; then
     echo -e "${YELLOW}Run: source $SHELL_RC${NC}"
 fi
 
-echo -e "\n${BOLD}Step 4: Configuring agent-flywheel${NC}"
+echo -e "\n${BOLD}Step 4: AI Authentication Setup${NC}"
+echo ""
+echo -e "${BLUE}Choose how to authenticate with AI services:${NC}"
+echo ""
+echo "  1) ChatGPT Subscription (OAuth)"
+echo "  2) OpenAI API Key"
+echo "  3) Skip for now"
+echo ""
+read -p "Enter choice [1-3]: " AUTH_CHOICE
+
+case $AUTH_CHOICE in
+    1)
+        echo -e "\n${BLUE}Setting up ChatGPT OAuth...${NC}"
+        ./scripts/setup-codex-oauth.sh
+        echo -e "${GREEN}✓${NC} ChatGPT OAuth configured"
+        ;;
+    2)
+        echo -e "\n${BLUE}Setting up OpenAI API Key...${NC}"
+        echo "Create /tmp/openai-key.txt with your API key, then run:"
+        echo "  ./scripts/setup-openai-key.sh"
+        ;;
+    3)
+        echo -e "\n${BLUE}Skipping AI authentication${NC}"
+        echo "You can set it up later with:"
+        echo "  ./scripts/setup-codex-oauth.sh"
+        echo "  ./scripts/setup-openai-key.sh"
+        ;;
+    *)
+        echo -e "\n${YELLOW}Invalid choice, skipping AI setup${NC}"
+        ;;
+esac
+
+echo -e "\n${BOLD}Step 5: Configuring agent-flywheel${NC}"
 
 # Set MCP_AGENT_MAIL_DIR env var
 SHELL_RC=$([ "$SHELL" = *"zsh"* ] && echo "$HOME/.zshrc" || echo "$HOME/.bashrc")
@@ -153,7 +185,7 @@ if ! grep -q "MCP_AGENT_MAIL_DIR" "$SHELL_RC" 2>/dev/null; then
     echo -e "${GREEN}✓${NC} Set MCP_AGENT_MAIL_DIR in $SHELL_RC"
 fi
 
-echo -e "\n${BOLD}Step 5: Verifying installation${NC}"
+echo -e "\n${BOLD}Step 6: Verifying installation${NC}"
 ./verify-cross-platform.sh || echo -e "${YELLOW}Some checks failed - review output above${NC}"
 
 echo -e "\n${GREEN}${BOLD}✅ Installation complete!${NC}\n"
