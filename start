@@ -1,0 +1,4 @@
+#!/bin/bash
+# Quick launcher for agent-flywheel multi-agent sessions
+
+./scripts/start-multi-agent-session-v2.sh "$@"

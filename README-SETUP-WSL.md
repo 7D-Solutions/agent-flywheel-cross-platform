@@ -4,125 +4,108 @@ This guide helps you set up the cross-platform version of agent-flywheel on Wind
 
 **NOTE**: This is the cross-platform version with fixes for WSL compatibility. All scripts have been updated to work on both macOS and Linux.
 
-## 1) Prereqs (Windows)
-- Install **Docker Desktop** and enable **WSL2 integration**.
-- Install **Git for Windows** (optional if you only use Git inside WSL).
+---
 
-## 2) Prereqs (Ubuntu / WSL)
-```bash
-sudo apt update
-sudo apt install -y tmux jq curl python3 git
-```
-(Optional) if available in your distro:
-```bash
-sudo apt install -y fswatch
-```
+## Quick Setup (Recommended) 🚀
 
-## 3) Get agent-flywheel-cross-platform
+**One-command installation** - the installer handles everything automatically:
+
 ```bash
-# Clone to any directory you prefer (no specific structure required)
-cd ~  # or any directory of your choice
+# 1. Clone the repository
 git clone <REPO_URL> agent-flywheel-cross-platform
 cd agent-flywheel-cross-platform
 
-# Option B: Copy from existing installation
-# (If you already have it on macOS and are using shared folders)
-cp -r /mnt/c/Users/<your-windows-user>/path/to/agent-flywheel-cross-platform ~/
+# 2. Run the installer
+./install.sh
+
+# 3. Start your first session
+./start
 ```
 
-## 4) MCP Agent Mail server
+The installer will:
+- ✅ Detect WSL environment automatically
+- ✅ Check and prompt to install missing dependencies (tmux, jq, docker, etc.)
+- ✅ Clone and configure MCP Agent Mail
+- ✅ Set up Python paths for WSL
+- ✅ Configure environment variables
+
+**That's it!** Skip to the [Troubleshooting](#troubleshooting-wsl-specific-issues) section if you encounter any issues.
+
+---
+
+## Manual Setup (Advanced)
+
+If you prefer manual control or the installer doesn't work for your setup:
+
+### 1) Prereqs (Windows)
+- Install **Docker Desktop** and enable **WSL2 integration**
+- Install **Git for Windows** (optional if you only use Git inside WSL)
+
+### 2) Prereqs (Ubuntu / WSL)
+```bash
+sudo apt update
+sudo apt install -y tmux jq curl python3 python3-pip git docker.io
+```
+
+### 3) Get agent-flywheel-cross-platform
+```bash
+cd ~  # or any directory of your choice
+git clone <REPO_URL> agent-flywheel-cross-platform
+cd agent-flywheel-cross-platform
+```
+
+### 4) MCP Agent Mail server
 ```bash
 git clone <MCP_AGENT_MAIL_REPO_URL> ~/mcp_agent_mail
+cd ~/mcp_agent_mail
+echo "HTTP_BEARER_TOKEN=<YOUR_TOKEN>" > .env
+docker compose up -d
 ```
-Create `~/mcp_agent_mail/.env` with:
-```
-HTTP_BEARER_TOKEN=<TOKEN>
-```
-Start the server:
+
+### 5) Set permissions and run
 ```bash
-cd ~/mcp_agent_mail && docker compose up -d
+cd ~/agent-flywheel-cross-platform
+chmod +x scripts/*.sh panes/*.sh
+./start
 ```
 
-## 5) Claude Hooks
-Copy the hooks into `~/.claude/hooks/`:
-```bash
-mkdir -p ~/.claude/hooks
-# Copy the hook(s) from this repo or from the source you were given
-cp /path/to/directory-restriction.py ~/.claude/hooks/
-```
-Configure the hook to allow your project directory (hooks can be configured for any location).
+---
 
-## 6) Permissions
-```bash
-cd /path/to/agent-flywheel-cross-platform
-chmod +x scripts/*.sh
-chmod +x panes/*.sh
-```
+## WSL-Specific Notes
 
-## 7) Run
-```bash
-cd /path/to/agent-flywheel-cross-platform
-./scripts/start-multi-agent-session.sh
-```
-
-**Important:** When prompted for the project path, choose the **project root** (not the `scripts/` folder).
-
-**No more `.fixed.v4.8` needed!** This cross-platform version works out of the box on WSL.
-
-## Notes
-- If mail seems missing, make sure the Mail server is running (`docker ps`).
-- If hooks block commands in a new project, confirm `directory-restriction.py` allows your project directory.
-- tmux runs **inside WSL** (not native Windows). Use Windows Terminal for the best experience.
-- For tmux usage: `Ctrl+b` then `d` to detach, `tmux ls` to list sessions.
-
-## What's Fixed in This Cross-Platform Version
-
-This version includes three critical fixes for WSL compatibility:
-
-1. **Dynamic path detection** - No hardcoded `/Users/james` paths
-   - Line 414 in `start-multi-agent-session.sh` now uses script-relative paths
-
-2. **Cross-platform sed** - Uses `tr` instead of macOS-specific `sed -E`
-   - Line 272 in `start-multi-agent-session.sh` now works on Linux
-
-3. **Platform-aware Python paths** - Automatically detects macOS vs Linux
-   - `setup-openai-key.sh` uses `~/.local/bin` on Linux
-   - `add-aider-to-path.sh` uses `~/.local/bin` on Linux
-   - Shell detection works with both bash and zsh
+- **tmux**: Runs inside WSL (not native Windows). Use Windows Terminal for the best experience.
+- **tmux usage**: `Ctrl+b` then `d` to detach, `tmux ls` to list sessions
+- **Docker**: Requires Docker Desktop with WSL2 integration enabled
+- **Health check**: Run `./scripts/doctor.sh` to verify your setup
 
 ## Troubleshooting WSL-Specific Issues
 
-### Python packages not found
+**First step:** Run the health check to diagnose issues:
 ```bash
-# Ensure ~/.local/bin is in PATH
+./scripts/doctor.sh
+```
+
+### Common Issues
+
+**Python packages not found**
+```bash
 echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Auto-registration fails (no agent names)
-Ensure `python3` is installed and on PATH (required for name generation):
-```bash
-python3 --version
-```
+**Docker not accessible**
+- Enable WSL2 integration in Docker Desktop settings
+- Verify with: `docker ps`
 
-### Docker not accessible
+**tmux colors wrong**
 ```bash
-# Check Docker Desktop WSL integration is enabled
-docker ps
-# If it fails, enable WSL integration in Docker Desktop settings
-```
-
-### tmux colors look wrong
-```bash
-# Add to ~/.bashrc
 echo 'export TERM=xterm-256color' >> ~/.bashrc
 source ~/.bashrc
 ```
 
-### Permission denied on scripts
+**Permission denied**
 ```bash
-# Make sure all scripts are executable
-cd /path/to/agent-flywheel-cross-platform
-chmod +x scripts/*.sh
-chmod +x panes/*.sh
+chmod +x scripts/*.sh panes/*.sh
 ```
+
+For more help, see the main [README.md](README.md) troubleshooting section.

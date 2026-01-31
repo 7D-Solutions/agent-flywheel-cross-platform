@@ -173,8 +173,8 @@
 
 - Agent Mail System: `AGENT_MAIL.md`
 - MCP Agent Mail Tests: `~/mcp_agent_mail/tests/test_file_reservation_lifecycle.py`
-- Integration Project Docs: `/Users/james/Projects/agent-flywheel-integration/docs/`
-- Governance Framework: `/agent-flywheel-integration/docs/phase-1-governance.md`
+- Integration Project Docs: `<agent-flywheel-integration>/docs/`
+- Governance Framework: `<agent-flywheel-integration>/docs/phase-1-governance.md`
 
 ---
 

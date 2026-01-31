@@ -40,21 +40,42 @@ sudo apt install -y tmux jq curl python3 python3-pip git
 
 ## Quick Start
 
-### 1. Clone or Copy This Repository
+**🚀 New: One-Command Installation!**
+
+```bash
+# Clone the repository
+git clone <repo-url> agent-flywheel-cross-platform
+cd agent-flywheel-cross-platform
+
+# Run the installer - it handles everything!
+./install.sh
+
+# Start your first multi-agent session
+./start
+```
+
+That's it! The installer will:
+- ✅ Auto-detect your platform (macOS/Linux/WSL)
+- ✅ Check and optionally install dependencies (tmux, jq, docker, etc.)
+- ✅ Clone and set up MCP Agent Mail
+- ✅ Configure Python paths
+- ✅ Set environment variables
+
+### Alternative: Manual Setup
+
+If you prefer manual control or want to understand the setup:
+
+#### 1. Clone the Repository
 
 ```bash
 # Clone to ANY directory you prefer (no specific structure required):
 git clone <repo-url> agent-flywheel-cross-platform
 cd agent-flywheel-cross-platform
-
-# Or if copying from existing installation:
-cp -r /path/to/agent-flywheel-cross-platform /your/preferred/location/
-cd /your/preferred/location/agent-flywheel-cross-platform
 ```
 
 The scripts will work from any location - there's no requirement for a `~/Projects` directory or any specific folder structure.
 
-### 2. Set Up OpenAI API Key (Optional)
+#### 2. Set Up OpenAI API Key (Optional)
 
 If you want to use AI-powered agents like aider:
 
@@ -73,11 +94,16 @@ cd /path/to/agent-flywheel-cross-platform
 # - Securely delete the temp file
 ```
 
-### 3. Start a Multi-Agent Session
+#### 3. Start a Multi-Agent Session
 
+**Easy way:**
 ```bash
-cd /path/to/agent-flywheel-cross-platform
-./scripts/start-multi-agent-session.sh
+./start
+```
+
+**Or the long way:**
+```bash
+./scripts/start-multi-agent-session-v2.sh
 ```
 
 The script will:
@@ -130,24 +156,56 @@ See [AGENT_MAIL.md](./AGENT_MAIL.md) for commands to send messages between agent
 
 ```
 agent-flywheel-cross-platform/
+├── install.sh                          # One-command installer
+├── start                               # Quick launcher
+├── LICENSE                             # MIT License
+├── CHANGELOG.md                        # Version history
 ├── scripts/
-│   ├── start-multi-agent-session.sh    # Main launcher (cross-platform)
-│   ├── setup-openai-key.sh             # API key setup (cross-platform)
-│   ├── add-aider-to-path.sh            # PATH helper (cross-platform)
+│   ├── start-multi-agent-session-v2.sh # Main session creator
+│   ├── doctor.sh                       # Health check (NEW!)
+│   ├── setup-openai-key.sh             # API key setup
 │   ├── agent-mail-helper.sh            # Inter-agent messaging
 │   ├── auto-register-agent.sh          # Agent registration
 │   └── lib/
 │       └── project-config.sh           # Project-specific config
-├── panes/
-│   └── *.sh                            # Pane startup scripts
+├── panes/                              # Pane startup scripts
 ├── .tmux.conf.agent-flywheel           # tmux configuration
 ├── AGENT_MAIL.md                       # Communication guide
 └── README-SETUP-WSL.md                 # WSL-specific setup
 ```
 
+## Health Check
+
+**Run a comprehensive system check:**
+
+```bash
+./scripts/doctor.sh
+```
+
+This checks:
+- ✓ System dependencies (tmux, jq, docker, python3, git, curl)
+- ✓ Docker status
+- ✓ MCP Agent Mail installation and server status
+- ✓ Python environment and PATH
+- ✓ Tmux configuration
+- ✓ Active tmux sessions
+- ✓ File permissions
+- ✓ Network ports
+- ✓ Git repository status
+- ✓ Environment variables
+
+**Output:** Color-coded pass ✓ / warn ⚠ / fail ✗ with actionable fixes.
+
 ## Troubleshooting
 
-### "Command not found: aider"
+**First, run the health check to diagnose issues:**
+```bash
+./scripts/doctor.sh
+```
+
+### Common Issues
+
+#### "Command not found: aider"
 
 ```bash
 # Add Python bin to PATH
