@@ -190,10 +190,15 @@ else
     check_warn "MCP_AGENT_MAIL_DIR not set (will use default)"
 fi
 
-if [ -n "${OPENAI_API_KEY:-}" ]; then
+# Check for AI authentication (either API key or Codex OAuth)
+if [ -f "$HOME/.codex/auth.json" ]; then
+    check_pass "Codex OAuth configured (uses ChatGPT subscription)"
+elif [ -n "${OPENAI_API_KEY:-}" ]; then
     check_pass "OPENAI_API_KEY is set"
 else
-    check_warn "OPENAI_API_KEY not set (optional)"
+    check_warn "No AI authentication configured"
+    echo "         Run: ./scripts/setup-codex-oauth.sh"
+    echo "         Or:  ./scripts/setup-openai-key.sh"
 fi
 
 # Summary
