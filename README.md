@@ -1,283 +1,419 @@
-# Agent-Flywheel Cross-Platform
+# Agent Flywheel 🎡
 
-A cross-platform version of agent-flywheel that works on both macOS and Linux (including WSL).
+> **Run multiple AI agents working together on your projects**
+> Super simple. Beautiful interface. Works on Mac & Windows.
 
-## Overview
+![Status: Ready to Use](https://img.shields.io/badge/status-ready-brightgreen)
+![Beginner Friendly](https://img.shields.io/badge/beginner-friendly-blue)
 
-This is a standalone cross-platform version of the agent-flywheel multi-agent system. It has been modified to work seamlessly on:
-- macOS (Intel and Apple Silicon)
-- Linux (Ubuntu, Debian, etc.)
-- Windows Subsystem for Linux (WSL)
+---
 
-## Key Differences from Original
+## ⚡ 3-Step Setup (5 minutes)
 
-This version fixes three critical compatibility issues:
+### Mac / Linux:
 
-1. **Dynamic path detection** - No hardcoded `/Users/james` paths
-2. **Cross-platform sed** - Uses `tr` instead of macOS-specific `sed -E`
-3. **Platform-aware Python paths** - Detects macOS vs Linux Python bin locations
-4. **Shell detection** - Works with both bash and zsh
-
-## Prerequisites
-
-### macOS
 ```bash
-# Install Homebrew if not already installed
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+# 1. Get the code
+git clone <your-repo-url> agent-flywheel
+cd agent-flywheel
 
-# Install dependencies
+# 2. Run installer
+./install.sh
+
+# 3. Start!
+./start
+```
+
+### Windows:
+
+```cmd
+REM 1. Get the code
+git clone <your-repo-url> agent-flywheel
+cd agent-flywheel
+
+REM 2 & 3. Run the Windows launcher (handles everything!)
+start.bat
+```
+
+**That's literally it.** 🎉
+
+The Windows launcher will:
+- ✅ Check if WSL is installed
+- ✅ Offer to install WSL if needed (one-click!)
+- ✅ Install Ubuntu automatically
+- ✅ Run the installer inside WSL
+- ✅ Launch the visual interface
+
+**Just double-click `start.bat` or run it from Command Prompt!**
+
+---
+
+## 🎨 What You Get
+
+A beautiful visual interface to manage your AI agent teams:
+
+```
+╭────────────────────────────────────────────╮
+│     Agent Flywheel - Session Manager      │
+╰────────────────────────────────────────────╯
+
+  🟢 my-app        Running    4 agents
+  🔵 website       Attached   4 agents
+  💀 old-project   Killed     Jan 30
+
+Tab: Select | Enter: Actions | Q: Quit
+```
+
+**What you can do:**
+- 📁 **Create new projects** → File picker opens, choose folder, done!
+- 🚀 **Attach to sessions** → See your agents working
+- 💀 **Kill sessions** → They're saved, bring them back later
+- 🔄 **Resurrect old sessions** → One click to restore
+- 🗑️ **Delete permanently** → Clean up when done
+
+**Controls:**
+- Arrow keys to navigate
+- Tab to select multiple
+- Enter for actions
+- Q to quit
+
+---
+
+## 🤔 What's This For?
+
+### For New Coders
+Get AI help on your projects without complex setup. 4 AI agents work together to:
+- Write code
+- Fix bugs
+- Answer questions
+- Help you learn
+
+### For Experienced Devs
+Save $400+/month by using ChatGPT subscription instead of API billing. Multi-agent coordination for complex tasks.
+
+---
+
+## 💰 Save Money (Important!)
+
+**Before this tool:**
+- $20/day on OpenAI API
+- $600/month 😰
+
+**After:**
+- Use ChatGPT subscription
+- ~$200/month ✅
+- **Save $400/month!**
+
+**How:** During install, choose **"ChatGPT OAuth"** option.
+
+---
+
+## 🎯 Common Tasks
+
+### Start Your First Project
+```bash
+./start
+```
+Press **N** → Pick your project folder → Done!
+
+### Check on Your Agents
+```bash
+./start
+```
+Select a session → Press **A** → See them working!
+
+### Take a Break (Keep Agents Working)
+Inside a session, press:
+**Ctrl+b** then **d**
+
+Agents keep running in background. Come back anytime!
+
+### Stop for the Day
+```bash
+./start
+```
+Select sessions → Press **K** → They're saved for tomorrow!
+
+### Resume Tomorrow
+```bash
+./start
+```
+Select 💀 killed session → Press **R** → Back in action!
+
+---
+
+## 🖥️ Works On
+
+- ✅ **Mac** (Terminal or iTerm2)
+- ✅ **Windows** (Command Prompt, PowerShell, or WSL) - Auto-setup!
+- ✅ **Linux** (any distro)
+
+### Windows: Super Easy Setup!
+
+**Just run `start.bat` from Command Prompt** - it does everything:
+
+1. Checks if WSL is installed
+2. If not → Offers one-click WSL installation
+3. Installs Ubuntu automatically
+4. Runs the installer inside WSL
+5. Launches the visual interface
+
+**No manual WSL setup needed!** The .bat file handles it all.
+
+**Alternative:** Use `start.ps1` for PowerShell users
+
+---
+
+## 🆘 Help!
+
+### "I don't see the visual interface"
+
+When you run `./start`, it asks: **"Install fzf?"**
+Press **Y** → Auto-installs → Visual interface appears!
+
+Or manually:
+```bash
+./setup-fzf.sh
+```
+
+### "Permission denied"
+
+```bash
+chmod +x start install.sh setup-fzf.sh
+./start
+```
+
+### "Nothing's happening"
+
+Check what's running:
+```bash
+./scripts/doctor.sh
+```
+
+This shows what's working and what needs fixing.
+
+### "I'm confused"
+
+Just run `./start` and press buttons! You can't break anything - everything's saved automatically.
+
+---
+
+## 🎓 Learn More
+
+**Beginner Guides:**
+- [Full Testing Guide](./VISUAL-INTERFACE-GUIDE.md) - Every feature explained
+- [Agent Communication](./AGENT_MAIL.md) - How agents talk to each other
+
+**For Devs:**
+- See "Advanced Setup" section below
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+**In the visual interface:**
+- ↑↓ - Navigate
+- Tab - Select/deselect
+- Enter - Open actions
+- Ctrl-A - Select all
+- Ctrl-D - Deselect all
+- Q - Quit
+
+**Inside a session (with 4 agent panes):**
+- **Ctrl+b** then **arrow keys** - Switch panes
+- **Ctrl+b** then **d** - Detach (go back to menu)
+- **Ctrl+b** then **z** - Zoom current pane
+- **Ctrl+b** then **q** - Show pane numbers
+
+---
+
+## 📊 Quick Reference
+
+| I Want To... | What I Do |
+|--------------|-----------|
+| Start first time | `./install.sh` → `./start` |
+| Create new project | `./start` → **N** |
+| See all sessions | `./start` |
+| Work on a project | `./start` → Select → **A** |
+| Stop for now | Inside session: **Ctrl+b d** |
+| End session (save it) | `./start` → Select → **K** |
+| Resume old session | `./start` → Select 💀 → **R** |
+| Delete forever | `./start` → Select 💀 → **D** |
+| Fix problems | `./scripts/doctor.sh` |
+
+---
+
+## 🌟 Tips for Success
+
+1. **Use iTerm2 on Mac** - Better experience than Terminal.app
+2. **Select multiple sessions** - Tab to select, do actions on all at once
+3. **Don't delete right away** - Kill sessions first, resurrect if you need them
+4. **Detach, don't quit** - Ctrl+b d keeps agents working in background
+5. **Run doctor.sh if stuck** - Shows exactly what's wrong
+
+---
+
+## 🚀 Advanced Setup
+
+<details>
+<summary>Click to expand detailed setup options</summary>
+
+### Prerequisites
+
+**macOS:**
+```bash
 brew install tmux jq
 ```
 
-### Linux/WSL
+**Linux/WSL:**
 ```bash
-# Update package list
 sudo apt update
-
-# Install dependencies
 sudo apt install -y tmux jq curl python3 python3-pip git
 ```
 
-## Quick Start
+### AI Authentication Options
 
-**🚀 New: One-Command Installation!**
-
+**Option A: ChatGPT OAuth (Recommended)**
 ```bash
-# Clone the repository
-git clone <repo-url> agent-flywheel-cross-platform
-cd agent-flywheel-cross-platform
-
-# Run the installer - it handles everything!
-./install.sh
-
-# Start your first multi-agent session
-./start
+./scripts/setup-codex-oauth.sh
 ```
+- Uses your ChatGPT Plus/Pro subscription
+- No extra API costs
+- Unlimited usage within subscription limits
 
-That's it! The installer will:
-- ✅ Auto-detect your platform (macOS/Linux/WSL)
-- ✅ Check and optionally install dependencies (tmux, jq, docker, etc.)
-- ✅ Clone and set up MCP Agent Mail
-- ✅ Configure Python paths
-- ✅ Set environment variables
-
-### Alternative: Manual Setup
-
-If you prefer manual control or want to understand the setup:
-
-#### 1. Clone the Repository
-
+**Option B: OpenAI API Key**
 ```bash
-# Clone to ANY directory you prefer (no specific structure required):
-git clone <repo-url> agent-flywheel-cross-platform
-cd agent-flywheel-cross-platform
-```
-
-The scripts will work from any location - there's no requirement for a `~/Projects` directory or any specific folder structure.
-
-#### 2. Set Up OpenAI API Key (Optional)
-
-If you want to use AI-powered agents like aider:
-
-```bash
-# Create a temporary file with your OpenAI key
-echo "sk-proj-YOUR-KEY-HERE" > /tmp/openai-key.txt
-
-# Run the setup script (from wherever you saved the project)
-cd /path/to/agent-flywheel-cross-platform
+echo "sk-proj-YOUR-KEY" > /tmp/openai-key.txt
 ./scripts/setup-openai-key.sh
-
-# The script will:
-# - Validate your key
-# - Add it to your shell config
-# - Set up Python paths
-# - Securely delete the temp file
 ```
+- ⚠️ Costs ~$20/day
+- Not recommended unless you don't have ChatGPT subscription
 
-#### 3. Start a Multi-Agent Session
+### Manual Session Start
 
-**Easy way:**
-```bash
-./start
-```
-
-**Or the long way:**
 ```bash
 ./scripts/start-multi-agent-session-v2.sh
 ```
 
-The script will:
-- Prompt you for a session name (default: `flywheel`)
-- Prompt you for a project path (defaults to current directory)
-- Create a tmux session with multiple panes
-- Set up agent communication infrastructure
-- Launch your configured agents
+### Health Check
 
-**Important:** When asked for the project path, choose the **project root**.
+```bash
+./scripts/doctor.sh
+```
 
-### 4. Navigate the Session
+Checks:
+- System dependencies
+- Docker status
+- MCP Agent Mail
+- Python environment
+- Tmux config
+- Active sessions
+- File permissions
+- Network ports
 
-Inside tmux:
-- `Ctrl+b then arrow keys` - Switch between panes
-- `Ctrl+b d` - Detach from session (keeps running)
-- `tmux attach -t <session-name>` - Reattach to session
-- `Ctrl+b :kill-session` - End session
+### Platform-Specific Notes
 
-## Configuration
+**macOS:**
+- Python packages: `~/Library/Python/3.9/bin`
+- Shell: zsh (default)
+- Best with iTerm2
 
-### Project Configuration
+**Linux/WSL:**
+- Python packages: `~/.local/bin`
+- Shell: bash (default)
+- Use Windows Terminal for WSL
 
-The system automatically creates `scripts/lib/project-config.sh` when needed. You can customize:
+**Windows:**
+- Requires WSL or Git Bash
+- See [README-SETUP-WSL.md](./README-SETUP-WSL.md)
 
-- Session name
-- Agent panes to launch
-- Default commands per pane
-- Working directory layout
-
-### Agent Communication
-
-See [AGENT_MAIL.md](./AGENT_MAIL.md) for commands to send messages between agents.
-
-## Platform-Specific Notes
-
-### macOS
-- Python packages install to `~/Library/Python/3.9/bin`
-- Uses `zsh` by default (can detect bash)
-- Native tmux support
-
-### Linux/WSL
-- Python packages install to `~/.local/bin`
-- Uses `bash` by default (can detect zsh)
-- tmux is available **inside WSL** (not native Windows)
-- Use Windows Terminal for the best WSL + tmux experience
-- WSL-specific setup guide: [README-SETUP-WSL.md](./README-SETUP-WSL.md)
-
-## File Structure
+### File Structure
 
 ```
-agent-flywheel-cross-platform/
-├── install.sh                          # One-command installer
-├── start                               # Quick launcher
-├── LICENSE                             # MIT License
-├── CHANGELOG.md                        # Version history
+agent-flywheel/
+├── start                    # Quick launcher
+├── install.sh               # One-command installer
+├── setup-fzf.sh             # Visual interface installer
 ├── scripts/
-│   ├── start-multi-agent-session-v2.sh # Main session creator
-│   ├── doctor.sh                       # Health check (NEW!)
-│   ├── setup-openai-key.sh             # API key setup
-│   ├── agent-mail-helper.sh            # Inter-agent messaging
-│   ├── auto-register-agent.sh          # Agent registration
-│   └── lib/
-│       └── project-config.sh           # Project-specific config
-├── panes/                              # Pane startup scripts
-├── .tmux.conf.agent-flywheel           # tmux configuration
-├── AGENT_MAIL.md                       # Communication guide
-└── README-SETUP-WSL.md                 # WSL-specific setup
+│   ├── visual-session-manager.sh    # Visual interface (NEW!)
+│   ├── file-picker.sh               # Cross-platform file picker (NEW!)
+│   ├── start-multi-agent-session-v2.sh
+│   ├── doctor.sh            # Health check
+│   ├── setup-codex-oauth.sh # ChatGPT OAuth setup (NEW!)
+│   └── setup-openai-key.sh  # API key setup
+├── .session-state/          # Saved sessions for resurrection
+└── VISUAL-INTERFACE-GUIDE.md
 ```
 
-## Health Check
+</details>
 
-**Run a comprehensive system check:**
+---
 
+## 🐛 Troubleshooting
+
+**First, always run:**
 ```bash
 ./scripts/doctor.sh
 ```
 
-This checks:
-- ✓ System dependencies (tmux, jq, docker, python3, git, curl)
-- ✓ Docker status
-- ✓ MCP Agent Mail installation and server status
-- ✓ Python environment and PATH
-- ✓ Tmux configuration
-- ✓ Active tmux sessions
-- ✓ File permissions
-- ✓ Network ports
-- ✓ Git repository status
-- ✓ Environment variables
+This tells you exactly what's wrong and how to fix it.
 
-**Output:** Color-coded pass ✓ / warn ⚠ / fail ✗ with actionable fixes.
-
-## Troubleshooting
-
-**First, run the health check to diagnose issues:**
-```bash
-./scripts/doctor.sh
-```
-
-### Common Issues
-
-#### "Command not found: aider"
+**Common fixes:**
 
 ```bash
-# Add Python bin to PATH
-./scripts/add-aider-to-path.sh
+# Permission errors
+chmod +x start install.sh setup-fzf.sh
 
-# Then reload your shell
-source ~/.zshrc  # or source ~/.bashrc on Linux
+# Missing dependencies
+./install.sh
+
+# Visual interface not showing
+./setup-fzf.sh
+
+# Session conflicts
+./start  # Then press K to kill old sessions
+
+# Python package issues
+./scripts/doctor.sh  # Shows the fix
 ```
 
-### "Session already exists"
+---
 
-```bash
-# List existing sessions
-tmux list-sessions
+## 🎯 Philosophy
 
-# Kill old session
-tmux kill-session -t flywheel
+This tool is designed to be **stupid simple** for beginners:
 
-# Or attach to it
-tmux attach -t flywheel
-```
+1. **One command to install** - `./install.sh`
+2. **One command to run** - `./start`
+3. **Visual interface** - No typing commands
+4. **Can't break it** - Everything's saved automatically
+5. **Get unstuck fast** - `./scripts/doctor.sh` shows fixes
 
-### Python packages not found on Linux
+If you're confused, just run `./start` and press buttons. That's it!
 
-```bash
-# Make sure ~/.local/bin is in PATH
-echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-```
+---
 
-### Auto-registration fails (no agent names)
-Ensure `python3` is installed and on PATH (required for name generation):
-```bash
-python3 --version
-```
+## ❤️ You Got This!
 
-### WSL-specific issues
+New to coding? **Perfect.** This tool is for you.
 
-See [README-SETUP-WSL.md](./README-SETUP-WSL.md) for detailed WSL troubleshooting.
+Experienced dev? **Great.** Save $400/month on AI costs.
 
-## Testing
+**Just run `./start` and explore!** 🚀
 
-### Test on macOS
-```bash
-cd /path/to/agent-flywheel-cross-platform
-./scripts/start-multi-agent-session.sh
-# Should work without errors
-```
+---
 
-### Test on Linux/WSL
-```bash
-cd /path/to/agent-flywheel-cross-platform
-./scripts/start-multi-agent-session.sh
-# Should work without errors
-```
+## 📝 License
 
-## Contributing
+MIT License - Use it however you want!
 
-This is a cross-platform fork designed for maximum compatibility. When making changes:
+---
 
-1. Test on both macOS and Linux if possible
-2. Avoid platform-specific commands (use conditionals)
-3. Use `$OSTYPE` for platform detection
-4. Use portable shell constructs (POSIX when possible)
+## 🙋 Need Help?
 
-## License
+1. Run `./scripts/doctor.sh` - Shows what's wrong
+2. Check [VISUAL-INTERFACE-GUIDE.md](./VISUAL-INTERFACE-GUIDE.md) - Full guide
+3. Read error messages - They tell you what to do
+4. Try `./start` again - Often just works™
 
-Same as original agent-flywheel project.
-
-## Support
-
-For issues:
-- WSL-specific: See [README-SETUP-WSL.md](./README-SETUP-WSL.md)
-- General: Check original agent-flywheel documentation
-- Agent communication: See [AGENT_MAIL.md](./AGENT_MAIL.md)
+**Remember:** You can't break anything. Sessions are auto-saved. Just explore! 🌟
