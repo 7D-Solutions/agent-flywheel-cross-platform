@@ -476,7 +476,11 @@ EOF
     esac
 }
 
-manage_existing_sessions
+# Only show existing sessions menu if not coming from visual session manager
+# (user already saw sessions there and chose to create new)
+if [ "${SKIP_EXISTING_SESSIONS_CHECK:-0}" != "1" ]; then
+    manage_existing_sessions
+fi
 
 check_duplicate_agent_names() {
     local phase="$1"
@@ -522,23 +526,28 @@ else
 fi
 echo ""
 
-# Prompt for session name (loop until resolved)
-while true; do
-    echo -e "${BLUE}Give your multi-agent session a name (or press Enter for 'flywheel'):${NC}"
-    echo -en "${YELLOW}Session name:${NC} "
-    read SESSION_NAME || SESSION_NAME=""
-    SESSION_NAME=${SESSION_NAME:-flywheel}
-    SESSION_SAFE=$(echo "$SESSION_NAME" | tr -cs 'A-Za-z0-9_-' '_' | tr '[:upper:]' '[:lower:]' | sed 's/^_*//;s/_*$//')
-    if [ -z "$SESSION_SAFE" ]; then
-        echo -e "${RED}Error: Session name cannot be empty after sanitization${NC}"
-        log "ERROR: Invalid session name provided"
-        continue
-    fi
-    if [ "$SESSION_SAFE" != "$SESSION_NAME" ]; then
-        echo -e "${YELLOW}Note: tmux session name normalized to '$SESSION_SAFE' from '$SESSION_NAME'${NC}"
-        log "Session name normalized from $SESSION_NAME to $SESSION_SAFE"
-    fi
-    log "Session name: $SESSION_NAME (tmux: $SESSION_SAFE)"
+# Prompt for session name (loop until resolved) - or use preset from visual manager
+if [ -n "$PRESET_SESSION_NAME" ]; then
+    SESSION_SAFE="$PRESET_SESSION_NAME"
+    SESSION_NAME="$SESSION_SAFE"
+    log "Using preset session name: $SESSION_NAME"
+else
+    while true; do
+        echo -e "${BLUE}Give your multi-agent session a name (or press Enter for 'flywheel'):${NC}"
+        echo -en "${YELLOW}Session name:${NC} "
+        read SESSION_NAME || SESSION_NAME=""
+        SESSION_NAME=${SESSION_NAME:-flywheel}
+        SESSION_SAFE=$(echo "$SESSION_NAME" | tr -cs 'A-Za-z0-9_-' '_' | tr '[:upper:]' '[:lower:]' | sed 's/^_*//;s/_*$//')
+        if [ -z "$SESSION_SAFE" ]; then
+            echo -e "${RED}Error: Session name cannot be empty after sanitization${NC}"
+            log "ERROR: Invalid session name provided"
+            continue
+        fi
+        if [ "$SESSION_SAFE" != "$SESSION_NAME" ]; then
+            echo -e "${YELLOW}Note: tmux session name normalized to '$SESSION_SAFE' from '$SESSION_NAME'${NC}"
+            log "Session name normalized from $SESSION_NAME to $SESSION_SAFE"
+        fi
+        log "Session name: $SESSION_NAME (tmux: $SESSION_SAFE)"
 
     # Check if we're currently in the target session
     CURRENT_SESSION=$(tmux display-message -p '#S' 2>/dev/null || echo "")
@@ -620,7 +629,8 @@ while true; do
     else
         break
     fi
-done
+    done
+fi
 
 # Prompt for project path (no directory scanning - fully portable)
 echo ""
@@ -690,45 +700,63 @@ echo -e "${BLUE}Creating agent mail documentation...${NC}"
 create_agent_mail_docs
 update_claude_md_reference
 
-# Prompt for number of Claude agents
-echo ""
-echo -e "${BLUE}How many AI coding agents do you want?${NC}"
-echo -e "${YELLOW}💡 Tip: Start with 2 Claude agents if you're not sure${NC}"
-echo ""
-echo -en "${YELLOW}Number of Claude agents (press Enter for 2):${NC} "
-read CLAUDE_COUNT || CLAUDE_COUNT=""
-CLAUDE_COUNT=${CLAUDE_COUNT:-2}
-
-# Prompt for number of Codex agents
-echo -en "${YELLOW}Number of Codex agents (press Enter for 0):${NC} "
-read CODEX_COUNT || CODEX_COUNT=""
-CODEX_COUNT=${CODEX_COUNT:-0}
-
-# NEW: Prompt for shared task list
-echo ""
-echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║  Shared Task List Configuration (NEW)                         ║${NC}"
-echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "${YELLOW}Shared task lists allow all agents to see and collaborate on the same tasks.${NC}"
-echo -e "${YELLOW}Without this, each agent has its own separate task list.${NC}"
-echo ""
-echo -en "${YELLOW}Enable shared task list for all agents? [y/N]:${NC} "
-read ENABLE_SHARED_TASKS || ENABLE_SHARED_TASKS=""
-ENABLE_SHARED_TASKS=${ENABLE_SHARED_TASKS:-N}
-
-TASK_LIST_ID=""
-if [[ "$ENABLE_SHARED_TASKS" =~ ^[Yy] ]]; then
-    echo -en "${YELLOW}Task list ID [default: $SESSION_SAFE-tasks]:${NC} "
-    read TASK_LIST_ID || TASK_LIST_ID=""
-    TASK_LIST_ID=${TASK_LIST_ID:-"$SESSION_SAFE-tasks"}
-    echo -e "${GREEN}✓ Shared task list enabled: $TASK_LIST_ID${NC}"
-    log "Shared task list enabled: $TASK_LIST_ID"
+# Prompt for number of agents - or use presets from visual manager
+if [ -n "$PRESET_CLAUDE_COUNT" ] && [ -n "$PRESET_CODEX_COUNT" ]; then
+    CLAUDE_COUNT="$PRESET_CLAUDE_COUNT"
+    CODEX_COUNT="$PRESET_CODEX_COUNT"
+    log "Using preset agent counts - Claude: $CLAUDE_COUNT, Codex: $CODEX_COUNT"
 else
-    echo -e "${BLUE}Each agent will have its own task list${NC}"
-    log "Shared task list disabled"
+    # Prompt for number of Claude agents
+    echo ""
+    echo -e "${BLUE}How many AI coding agents do you want?${NC}"
+    echo -e "${YELLOW}💡 Tip: Start with 2 Claude agents if you're not sure${NC}"
+    echo ""
+    echo -en "${YELLOW}Number of Claude agents (press Enter for 2):${NC} "
+    read CLAUDE_COUNT || CLAUDE_COUNT=""
+    CLAUDE_COUNT=${CLAUDE_COUNT:-2}
+
+    # Prompt for number of Codex agents
+    echo -en "${YELLOW}Number of Codex agents (press Enter for 0):${NC} "
+    read CODEX_COUNT || CODEX_COUNT=""
+    CODEX_COUNT=${CODEX_COUNT:-0}
 fi
-echo ""
+
+# Prompt for shared task list - or use preset
+if [ -n "$PRESET_ENABLE_SHARED_TASKS" ]; then
+    ENABLE_SHARED_TASKS="$PRESET_ENABLE_SHARED_TASKS"
+    TASK_LIST_ID="$PRESET_TASK_LIST_ID"
+    if [[ "$ENABLE_SHARED_TASKS" =~ ^[Yy]$ ]]; then
+        log "Using preset shared task list: $TASK_LIST_ID"
+    else
+        log "Using preset: Individual task lists"
+    fi
+else
+    # NEW: Prompt for shared task list
+    echo ""
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║  Shared Task List Configuration (NEW)                         ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "${YELLOW}Shared task lists allow all agents to see and collaborate on the same tasks.${NC}"
+    echo -e "${YELLOW}Without this, each agent has its own separate task list.${NC}"
+    echo ""
+    echo -en "${YELLOW}Enable shared task list for all agents? [y/N]:${NC} "
+    read ENABLE_SHARED_TASKS || ENABLE_SHARED_TASKS=""
+    ENABLE_SHARED_TASKS=${ENABLE_SHARED_TASKS:-N}
+
+    TASK_LIST_ID=""
+    if [[ "$ENABLE_SHARED_TASKS" =~ ^[Yy] ]]; then
+        echo -en "${YELLOW}Task list ID [default: $SESSION_SAFE-tasks]:${NC} "
+        read TASK_LIST_ID || TASK_LIST_ID=""
+        TASK_LIST_ID=${TASK_LIST_ID:-"$SESSION_SAFE-tasks"}
+        echo -e "${GREEN}✓ Shared task list enabled: $TASK_LIST_ID${NC}"
+        log "Shared task list enabled: $TASK_LIST_ID"
+    else
+        echo -e "${BLUE}Each agent will have its own task list${NC}"
+        log "Shared task list disabled"
+    fi
+    echo ""
+fi
 
 # Validate counts
 if ! [[ "$CLAUDE_COUNT" =~ ^[0-9]+$ ]] || ! [[ "$CODEX_COUNT" =~ ^[0-9]+$ ]]; then
