@@ -40,7 +40,7 @@ check_fzf() {
         case "$install_choice" in
             [Nn])
                 echo -e "${BLUE}Using text-based interface...${NC}"
-                exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
+                exec "$SCRIPT_DIR/start-multi-agent-session.sh"
                 ;;
             *)
                 echo -e "${GREEN}Installing fzf...${NC}"
@@ -64,7 +64,7 @@ check_fzf() {
                         echo ""
                         echo -e "${BLUE}Falling back to text interface...${NC}"
                         sleep 2
-                        exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
+                        exec "$SCRIPT_DIR/start-multi-agent-session.sh"
                     fi
                 else
                     echo -e "${RED}setup-fzf.sh not found${NC}"
@@ -80,7 +80,7 @@ check_fzf() {
                     echo ""
                     echo -e "${BLUE}Falling back to text interface...${NC}"
                     sleep 2
-                    exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
+                    exec "$SCRIPT_DIR/start-multi-agent-session.sh"
                 fi
                 ;;
         esac
@@ -945,7 +945,7 @@ create_new_session() {
 
     echo ""
     echo -e "${GREEN}🚀 Creating session...${NC}"
-    exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
+    exec "$SCRIPT_DIR/start-multi-agent-session.sh"
 }
 
 # Main entry point

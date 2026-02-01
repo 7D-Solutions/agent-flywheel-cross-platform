@@ -21,3 +21,4 @@ workflows/
 
 # Legacy/temp files
 review-for-delete/
+*.old
