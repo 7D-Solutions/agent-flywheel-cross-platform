@@ -48,17 +48,44 @@ cd /Users/james/Projects/agent-flywheel-cross-platform
 1. iTerm2 selection prompt appears (if not in iTerm)
 2. Visual interface launches
 3. Shows: "No sessions found (running or killed)"
-4. Options:
-   - `[N]` Create new session
-   - `[Q]` Quit
+4. Press `Ctrl+N` to create new session or `Esc` to quit
 
-**Test Action:** Press `N`
+**Test Action:** Press `Ctrl+N`
 
-**Expected:**
-- Native macOS file picker opens
-- You select a project folder
-- Session creation starts automatically
-- 4-agent tmux session launches
+**Expected - 4-Step Workflow:**
+
+**Step 1/4: Select Project Folder**
+- Native file picker opens
+- Navigate and select your project folder
+- Press Enter to confirm
+
+**Step 2/4: Session Name**
+- Prompt: "Session name (or press Enter for '[folder-name]'):"
+- Type a name or press Enter for default
+- System checks for name conflicts
+- If conflict exists, prompts to choose different name
+
+**Step 3/4: Agent Configuration**
+- Prompt: "Number of Claude agents (press Enter for 2):"
+- Type number or press Enter for default
+- Prompt: "Number of Codex agents (press Enter for 0):"
+- Type number or press Enter for default
+- Must have at least 1 agent total
+
+**Step 4/4: Shared Task List**
+- Prompt: "Enable shared task list? [y/N]:"
+- If yes: "Task list ID (press Enter for '[session-name]-tasks'):"
+- Shows whether agents will collaborate or work independently
+
+**Confirmation Screen**
+- Shows all your choices:
+  - Session name
+  - Project path
+  - Agent counts
+  - Task list configuration
+- Prompt: "Create session? [Y/n]:"
+- Press Y or Enter to create, N to cancel
+- Session creates and you're attached automatically
 
 ---
 
@@ -78,11 +105,11 @@ Create 2-3 sessions first using the tool.
 │      Agent Flywheel - Session Manager          │
 ╰─────────────────────────────────────────────────╯
 
-  🟢 session-1    Running   4 windows
-  🟢 session-2    Running   4 windows
-  🟢 session-3    Running   4 windows
+  🟢 session-1    Running   3 Claude, 1 Codex
+  🟢 session-2    Running   4 Claude
+  🟢 session-3    Running   2 Claude
 
-Tab: Select Multiple | Enter: Action Menu
+Tab: Select Multiple | Enter: Actions | Ctrl+N: New | Esc: Quit
 ```
 
 **Test Actions:**
@@ -109,23 +136,28 @@ Tab: Select Multiple | Enter: Action Menu
 ```
 Selected 2 session(s)
 
-[A] Attach to session(s)
-[K] Kill session(s)
-[N] Create new session
-[C] Cancel
+Choose an action:
+- Attach to session(s)
+- Kill session(s)
+- Cancel
 
-Your choice:
+Arrow keys to navigate, Enter to select
 ```
+
+**Note:** Create new session is now `Ctrl+N` from the main interface, not in action menu.
 
 ---
 
 ### Scenario 3: Attach to Single Session
 
-**Action:** Select one session, press Enter, then press `A`
+**Action:**
+1. Select one session with arrow keys
+2. Press `Enter` to open action menu
+3. Select "Attach" and press Enter
 
 **Expected:**
 - Attaches to the tmux session directly
-- You see the 4-agent panes
+- You see the multi-agent panes
 - Detach with `Ctrl+b d`
 - Returns to visual interface automatically
 
@@ -135,8 +167,8 @@ Your choice:
 
 **Action:**
 1. Select 2-3 sessions with `Tab`
-2. Press `Enter`
-3. Press `A`
+2. Press `Enter` to open action menu
+3. Select "Attach" and press Enter
 
 **Expected:**
 - Message: "Opening 3 sessions in new tabs..."
@@ -149,8 +181,8 @@ Your choice:
 
 **Action:**
 1. Select 1-2 sessions with `Tab`
-2. Press `Enter`
-3. Press `K`
+2. Press `Enter` to open action menu
+3. Select "Kill" and press Enter
 
 **Expected:**
 - Messages: "Saving and killing: session-1"
@@ -167,8 +199,8 @@ Your choice:
 
 **Action:**
 1. Select a killed session (💀 icon)
-2. Press `Enter`
-3. Press `R`
+2. Press `Enter` to open action menu
+3. Select "Resurrect" and press Enter
 
 **Expected:**
 - Message: "Resurrecting session: [name]"
@@ -184,8 +216,8 @@ Your choice:
 
 **Action:**
 1. Select one or more killed sessions (💀)
-2. Press `Enter`
-3. Press `D`
+2. Press `Enter` to open action menu
+3. Select "Delete permanently" and press Enter
 
 **Expected:**
 - Warning: "⚠️  This will permanently delete the session state files!"
@@ -199,16 +231,16 @@ Your choice:
 ### Scenario 8: Create New Session from Visual Interface
 
 **Action:**
-1. From any screen, select sessions (or none)
-2. Press `Enter`
-3. Press `N`
+1. From the main session list, press `Ctrl+N`
 
 **Expected:**
-- Message: "Select project folder for new session"
-- Native file picker opens
-- Select a folder
-- Message: "Selected: /path/to/folder"
-- Session creation starts
+- 4-step workflow begins (see Scenario 1 for details)
+- Step 1: File picker opens
+- Step 2: Name your session
+- Step 3: Configure agents
+- Step 4: Shared task list
+- Confirmation screen
+- Session creates and attaches
 
 ---
 
@@ -233,15 +265,17 @@ Your choice:
 ```
 Selected 2 session(s)
 
-[A] Attach to session(s)
-[K] Kill session(s)
-[R] Resurrect session(s)
-[D] Permanently delete session(s)
-[N] Create new session
-[C] Cancel
+Choose an action:
+- Attach to session(s)
+- Kill session(s)
+- Resurrect session(s)
+- Delete permanently
+- Cancel
+
+Arrow keys to navigate, Enter to select
 ```
 
-Note: All applicable actions shown for mixed selection
+Note: All applicable actions shown for mixed selection. Use `Ctrl+N` from main screen for new sessions.
 
 ---
 
@@ -313,19 +347,23 @@ fzf --version
 
 - [ ] Install fzf
 - [ ] Run `./start` - visual interface appears
-- [ ] Create new session with file picker
-- [ ] Navigate with arrow keys
+- [ ] Press `Ctrl+N` - 4-step workflow begins
+- [ ] Step 1: File picker opens and folder selection works
+- [ ] Step 2: Session name validation and conflict detection
+- [ ] Step 3: Agent count validation (must be > 0)
+- [ ] Step 4: Shared task list configuration
+- [ ] Confirmation screen shows all settings correctly
+- [ ] Session creates after confirmation
+- [ ] Navigate session list with arrow keys
 - [ ] Multi-select with Tab
+- [ ] Press Enter - action menu appears
 - [ ] Attach to single session
 - [ ] Attach to multiple sessions (iTerm2)
 - [ ] Kill sessions (check for save confirmation)
-- [ ] Verify killed sessions show with 💀
+- [ ] Verify killed sessions show with 💀 and agent counts
 - [ ] Resurrect a killed session
 - [ ] Permanently delete a killed session
-- [ ] Create new session from action menu
-- [ ] Test Ctrl-A (select all)
-- [ ] Test Ctrl-D (deselect all)
-- [ ] Test canceling with Ctrl-C
+- [ ] Test Esc to quit
 - [ ] Verify auto-return to menu after attach/detach
 
 ---
