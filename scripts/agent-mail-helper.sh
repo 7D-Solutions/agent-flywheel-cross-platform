@@ -505,7 +505,8 @@ EOF
     err=$(echo "$projects_json" | jq -r '.error.message // empty')
     if [ -n "$err" ]; then
         # Fallback: scan identity files on disk
-        local search_root="$HOME/Projects"
+        # Use environment variable or parent of current project, then fall back to $HOME
+        local search_root="${AGENT_PROJECTS_ROOT:-$(dirname "$AGENT_FLYWHEEL_ROOT")}"
         if [ ! -d "$search_root" ]; then
             search_root="$HOME"
         fi
@@ -686,7 +687,8 @@ send_message() {
     for recipient in "${RECIPIENTS[@]}"; do
         recipient=$(echo "$recipient" | xargs)
         [ -z "$recipient" ] && continue
-        local search_root="$HOME/Projects"
+        # Use environment variable or parent of current project, then fall back to $HOME
+        local search_root="${AGENT_PROJECTS_ROOT:-$(dirname "$AGENT_FLYWHEEL_ROOT")}"
         if [ ! -d "$search_root" ]; then
             search_root="$HOME"
         fi
