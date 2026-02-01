@@ -5,6 +5,9 @@
 
 ![Status: Ready to Use](https://img.shields.io/badge/status-ready-brightgreen)
 ![Beginner Friendly](https://img.shields.io/badge/beginner-friendly-blue)
+![Version 1.1.0](https://img.shields.io/badge/version-1.1.0-blue)
+
+📖 **[Quick Start Guide](QUICKSTART.md)** | 📋 **[Changelog](CHANGELOG.md)** | 🩺 **[Health Check](scripts/doctor.sh)**
 
 ---
 
@@ -14,7 +17,7 @@
 
 ```bash
 # 1. Get the code
-git clone <your-repo-url> agent-flywheel
+git clone https://github.com/7D-Solutions/agent-flywheel-cross-platform.git
 cd agent-flywheel
 
 # 2. Run installer
@@ -28,7 +31,7 @@ cd agent-flywheel
 
 ```cmd
 REM 1. Get the code
-git clone <your-repo-url> agent-flywheel
+git clone https://github.com/7D-Solutions/agent-flywheel-cross-platform.git
 cd agent-flywheel
 
 REM 2 & 3. Run the Windows launcher (handles everything!)
@@ -57,25 +60,55 @@ A beautiful visual interface to manage your AI agent teams:
 │     Agent Flywheel - Session Manager      │
 ╰────────────────────────────────────────────╯
 
-  🟢 my-app        Running    4 agents
-  🔵 website       Attached   4 agents
+  🟢 my-app        Running    3 Claude, 1 Codex
+  🔵 website       Attached   4 Claude
   💀 old-project   Killed     Jan 30
 
-Tab: Select | Enter: Actions | Q: Quit
+Tab: Select | Enter: Actions | Ctrl+N: New | Esc: Quit
 ```
 
 **What you can do:**
-- 📁 **Create new projects** → File picker opens, choose folder, done!
+- 📁 **Create new session** (Ctrl+N) → 4-step guided workflow
 - 🚀 **Attach to sessions** → See your agents working
 - 💀 **Kill sessions** → They're saved, bring them back later
 - 🔄 **Resurrect old sessions** → One click to restore
 - 🗑️ **Delete permanently** → Clean up when done
 
 **Controls:**
-- Arrow keys to navigate
-- Tab to select multiple
-- Enter for actions
-- Q to quit
+- **Ctrl+N** - Create new multi-agent session
+- **Enter** - Show actions for selected session(s)
+- **Tab** - Select multiple sessions
+- **Arrow keys** - Navigate
+- **Esc** or **Ctrl+C** - Quit
+
+### Creating a New Session (Ctrl+N)
+
+When you press **Ctrl+N**, you'll go through a simple 4-step guided workflow:
+
+**Step 1/4: Select Project Folder**
+- Graphical file picker appears
+- Navigate and select your project folder
+- Press Enter to confirm
+
+**Step 2/4: Session Name**
+- Enter a name for your session (or press Enter to use folder name)
+- Automatically checks for conflicts with existing sessions
+- Names are sanitized to be tmux-safe
+
+**Step 3/4: Agent Configuration**
+- Choose number of Claude agents (default: 2)
+- Choose number of Codex agents (default: 0)
+- Must have at least 1 agent total
+
+**Step 4/4: Shared Task List** (optional)
+- Enable shared task list for agent collaboration
+- All agents can see and work on the same tasks
+- Or keep individual task lists per agent
+
+**Confirmation Screen**
+- Review all your settings
+- Press Y to create, N to cancel
+- Session starts immediately after confirmation
 
 ---
 
@@ -232,13 +265,13 @@ Just run `./start` and press buttons! You can't break anything - everything's sa
 | I Want To... | What I Do |
 |--------------|-----------|
 | Start first time | `./install.sh` → `./start` |
-| Create new project | `./start` → **N** |
+| Create new session | `./start` → **Ctrl+N** |
 | See all sessions | `./start` |
-| Work on a project | `./start` → Select → **A** |
+| Work on a project | `./start` → Select → **Enter** → **A** |
 | Stop for now | Inside session: **Ctrl+b d** |
-| End session (save it) | `./start` → Select → **K** |
-| Resume old session | `./start` → Select 💀 → **R** |
-| Delete forever | `./start` → Select 💀 → **D** |
+| End session (save it) | `./start` → Select → **Enter** → **K** |
+| Resume old session | `./start` → Select 💀 → **Enter** → **R** |
+| Delete forever | `./start` → Select 💀 → **Enter** → **D** |
 | Fix problems | `./scripts/doctor.sh` |
 
 ---

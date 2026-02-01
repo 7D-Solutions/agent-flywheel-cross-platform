@@ -5,6 +5,33 @@ All notable changes to agent-flywheel-cross-platform will be documented in this 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-02-01
+
+### Added
+- **Visual session manager with fzf interface** - Beautiful interactive session browser
+- **Integrated 4-step session creation workflow** (Ctrl+N):
+  1. Select project folder via graphical file picker
+  2. Name your session with validation and conflict detection
+  3. Configure agents (Claude + Codex counts with defaults)
+  4. Optional shared task list setup
+  5. Confirmation screen before creation
+- **Agent type display in session list** - Shows "3 Claude, 1 Codex" breakdown
+- **Session resurrection** - Bring back killed sessions with one keystroke
+- **Multi-session selection** - Tab to select multiple sessions for batch operations
+- **Preset environment variable system** - Visual manager passes configuration to backend
+
+### Changed
+- **Key bindings improved** - Ctrl+N for new session (prevents search conflict)
+- **Session creation UX streamlined** - No redundant menus when coming from visual manager
+- **Agent mail project discovery** - Respects AGENT_PROJECTS_ROOT environment variable
+- **Session state persistence** - Better handling of killed session state files
+
+### Fixed
+- **Resurrect workflow** - No longer exits visual manager, returns to session list
+- **Session name sanitization** - Better tmux-safe character handling
+- **Redundant prompts eliminated** - Visual manager presets bypass duplicate questions
+- **Input validation** - Numeric validation for agent counts, session name conflict detection
+
 ## [1.0.0] - 2026-01-30
 
 ### Added
