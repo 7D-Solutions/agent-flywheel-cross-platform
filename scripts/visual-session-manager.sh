@@ -135,17 +135,35 @@ resurrect_session() {
         return 1
     fi
 
-    echo -e "${BLUE}Resurrecting session: $session_name${NC}"
+    # Check if session already exists
+    if tmux has-session -t "$session_name" 2>/dev/null; then
+        echo -e "${YELLOW}✓ Session already running: $session_name${NC}"
+        return 0
+    fi
 
-    # For now, we'll just restart the session creation script
-    # In a full implementation, we'd restore the exact layout
-    echo -e "${YELLOW}Note: Starting fresh session (full state restoration coming soon)${NC}"
+    # Read saved state
+    local project_path=""
+    if [ -f "$state_file" ]; then
+        # Extract project path from first pane's current path
+        project_path=$(grep "^PANE_" "$state_file" | head -1 | cut -d'=' -f2 | cut -d'|' -f1)
+    fi
 
-    # Remove the state file since we're resurrecting
-    rm -f "$state_file"
+    if [ -z "$project_path" ] || [ ! -d "$project_path" ]; then
+        project_path="$HOME"
+    fi
 
-    # Delegate to the main session creation script
-    exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
+    # Create basic tmux session in the background
+    tmux new-session -d -s "$session_name" -c "$project_path" 2>/dev/null
+
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}✓ Resurrected: $session_name${NC}"
+        # Keep state file for now (don't delete until we do full restoration)
+        # rm -f "$state_file"
+        return 0
+    else
+        echo -e "${RED}❌ Failed to resurrect: $session_name${NC}"
+        return 1
+    fi
 }
 
 # Permanently delete a killed session state
@@ -167,17 +185,71 @@ build_session_list() {
 
     # Collect sessions by status
     if tmux list-sessions &>/dev/null; then
-        while IFS='|' read -r name status attached windows; do
+        while IFS='|' read -r name session_state attached; do
+            # Count agents by type in this session
+            local agent_summary=""
+            local has_identity_files=false
+
+            # Use simple counters instead of associative arrays (bash 3.2 compatible)
+            local count_claude=0
+            local count_codex=0
+            local count_grok=0
+            local count_other=0
+
+            # Read identity files for each pane
+            while read -r pane_id; do
+                [ -z "$pane_id" ] && continue
+                local identity_file="panes/${pane_id}.identity"
+                if [ -f "$identity_file" ]; then
+                    has_identity_files=true
+                    local agent_type=$(grep '"type"' "$identity_file" | cut -d'"' -f4)
+                    # Normalize type names and count
+                    case "$agent_type" in
+                        claude-code|claude)
+                            count_claude=$((count_claude + 1))
+                            ;;
+                        codex)
+                            count_codex=$((count_codex + 1))
+                            ;;
+                        grok)
+                            count_grok=$((count_grok + 1))
+                            ;;
+                        *)
+                            count_other=$((count_other + 1))
+                            ;;
+                    esac
+                fi
+            done < <(tmux list-panes -s -t "$name" -F "#{session_name}-#{window_index}-#{pane_index}" 2>/dev/null)
+
+            # Build agent summary string
+            if [ "$has_identity_files" = true ]; then
+                # Show breakdown by type
+                local parts=""
+                [ "$count_claude" -gt 0 ] && parts="${count_claude} Claude"
+                [ "$count_codex" -gt 0 ] && parts="${parts:+$parts, }${count_codex} Codex"
+                [ "$count_grok" -gt 0 ] && parts="${parts:+$parts, }${count_grok} Grok"
+                [ "$count_other" -gt 0 ] && parts="${parts:+$parts, }${count_other} Other"
+                agent_summary="$parts"
+            fi
+
+            # Fallback: if no identity files, just count panes
+            if [ -z "$agent_summary" ]; then
+                local pane_count=$(tmux list-panes -s -t "$name" 2>/dev/null | wc -l | tr -d ' ')
+                local agent_label="agent"
+                [ "$pane_count" != "1" ] && agent_label="agents"
+                agent_summary="$pane_count $agent_label"
+            fi
+
             if [ "$attached" = "1" ]; then
                 # Attached sessions
-                attached_sessions+=$(printf "  🔵  %-28s  │  %s agents  │  Active Now|%s|Attached|%s|attached\n" \
-                    "$name" "$windows" "$name" "$windows")$'\n'
+                attached_sessions+=$(printf "  🔵  %-28s  │  %-24s │  Active Now|%s|Attached|%s|attached\n" \
+                    "$name" "$agent_summary" "$name" "$agent_summary")$'\n'
             else
                 # Running but detached
-                running_sessions+=$(printf "  🟢  %-28s  │  %s agents  │  Background|%s|Running|%s|running\n" \
-                    "$name" "$windows" "$name" "$windows")$'\n'
+                running_sessions+=$(printf "  🟢  %-28s  │  %-24s │  Background|%s|Running|%s|running\n" \
+                    "$name" "$agent_summary" "$name" "$agent_summary")$'\n'
             fi
-        done < <(tmux list-sessions -F "#{session_name}|running|#{session_attached}|#{session_windows}" 2>/dev/null)
+        done < <(tmux list-sessions -F "#{session_name}|running|#{session_attached}" 2>/dev/null)
     fi
 
     # Add killed sessions
@@ -193,40 +265,28 @@ build_session_list() {
         fi
     done < <(get_killed_sessions)
 
-    # Build final list with section headers
+    # Build final list with visual section separation
     local final_list=""
 
     if [ -n "$attached_sessions" ]; then
-        final_list+="||header||header"$'\n'
-        final_list+="  ┌──────────────────────────────────────────────────────────────┐||header||header"$'\n'
-        final_list+="  │ 📍 ATTACHED SESSIONS (Currently Viewing)                    │||header||header"$'\n'
-        final_list+="  └──────────────────────────────────────────────────────────────┘||header||header"$'\n'
         final_list+="$attached_sessions"
     fi
 
-    # Add separator between sections if we have more sections coming
+    # Add blank line separator between sections
     if [ -n "$attached_sessions" ] && { [ -n "$running_sessions" ] || [ -n "$killed_sessions" ]; }; then
-        final_list+="||separator||separator"$'\n'
+        final_list+=$'\n'
     fi
 
     if [ -n "$running_sessions" ]; then
-        final_list+="||header||header"$'\n'
-        final_list+="  ┌──────────────────────────────────────────────────────────────┐||header||header"$'\n'
-        final_list+="  │ ⚡ RUNNING SESSIONS (Background)                             │||header||header"$'\n'
-        final_list+="  └──────────────────────────────────────────────────────────────┘||header||header"$'\n'
         final_list+="$running_sessions"
     fi
 
-    # Add separator before killed sessions if needed
+    # Add blank line separator before killed sessions
     if [ -n "$running_sessions" ] && [ -n "$killed_sessions" ]; then
-        final_list+="||separator||separator"$'\n'
+        final_list+=$'\n'
     fi
 
     if [ -n "$killed_sessions" ]; then
-        final_list+="||header||header"$'\n'
-        final_list+="  ┌──────────────────────────────────────────────────────────────┐||header||header"$'\n'
-        final_list+="  │ 💾 SAVED SESSIONS (Can Resurrect)                           │||header||header"$'\n'
-        final_list+="  └──────────────────────────────────────────────────────────────┘||header||header"$'\n'
         final_list+="$killed_sessions"
     fi
 
@@ -263,24 +323,40 @@ show_visual_interface() {
             continue
         fi
 
-        # Show session list with fzf (headers and separators visible but will be filtered after selection)
+        # Show session list with fzf
         local selected=$(echo "$sessions" | fzf \
             --ansi \
             --multi \
+            --expect=ctrl-n \
             --header="
 ╔══════════════════════════════════════════════════════════════════════╗
 ║                  🎡  Agent Flywheel - Session Manager                ║
 ╠══════════════════════════════════════════════════════════════════════╣
-║                                                                      ║
+║  🔵 Attached (viewing now)  │  🟢 Running (background)  │  💀 Saved  ║
+╠══════════════════════════════════════════════════════════════════════╣
 ║   ↑↓  Move    │   Tab  Select Multiple    │   Enter  Actions       ║
-║   Q   Quit    │   Ctrl-A  Select All      │   N  Create New        ║
-║                                                                      ║
+║   Esc/Ctrl-C  Quit   │   Ctrl-A  Select All   │   Ctrl-N  New      ║
 ╚══════════════════════════════════════════════════════════════════════╝
 " \
             --header-lines=0 \
             --preview='
+# Check if line is blank or just whitespace
+if [ -z "$(echo {} | tr -d "[:space:]")" ]; then
+    echo ""
+    echo "  ═══════════════════════════════════"
+    echo "    Visual Separator"
+    echo "  ═══════════════════════════════════"
+    echo ""
+    echo "  This is just spacing between"
+    echo "  session groups."
+    echo ""
+    echo "  Select actual sessions instead."
+    echo ""
+    exit 0
+fi
+
 session_name=$(echo {} | cut -d"|" -f2)
-status=$(echo {} | cut -d"|" -f3)
+session_status=$(echo {} | cut -d"|" -f3)
 
 echo ""
 echo "╔════════════════════════════════════╗"
@@ -288,22 +364,22 @@ echo "║      SESSION INFORMATION           ║"
 echo "╚════════════════════════════════════╝"
 echo ""
 echo "  Name:     $session_name"
-echo "  Status:   $status"
+echo "  Status:   $session_status"
 echo ""
-if [ "$status" = "Attached" ]; then
+if [ "$session_status" = "Attached" ]; then
     echo "  📍 You are currently viewing"
     echo "     this session in another"
     echo "     window/tab."
     echo ""
     echo "  Actions:"
     echo "  • Detach: Ctrl+b then d"
-elif [ "$status" = "Running" ]; then
+elif [ "$session_status" = "Running" ]; then
     echo "  ⚡ Agents working in background"
     echo ""
     echo "  Actions:"
     echo "  • Press Enter → A to attach"
     echo "  • Press Enter → K to kill"
-elif [ "$status" = "Killed" ]; then
+elif [ "$session_status" = "Killed" ]; then
     echo "  💾 Session saved to disk"
     echo ""
     echo "  Actions:"
@@ -313,7 +389,7 @@ fi
 echo ""
 ' \
             --preview-window=right:45%:wrap:border-rounded \
-            --bind='ctrl-a:select-all,ctrl-d:deselect-all,q:abort' \
+            --bind='ctrl-a:select-all,ctrl-d:deselect-all' \
             --prompt="Select ❯ " \
             --pointer="▶ " \
             --marker="✓ " \
@@ -330,8 +406,21 @@ echo ""
             --color='marker:#00ff00,spinner:#ff00ff,header:#00d7ff' \
             --color='border:#555555,label:#00d7ff,preview-border:#555555')
 
+        # Extract the key pressed (first line with --expect)
+        local key_pressed=$(echo "$selected" | head -1)
+        local sessions_selected=$(echo "$selected" | tail -n +2)
+
+        # Check if user pressed Ctrl+N to create new session
+        if [ "$key_pressed" = "ctrl-n" ]; then
+            create_new_session
+            continue
+        fi
+
+        # Use sessions_selected instead of selected from now on
+        selected="$sessions_selected"
+
         if [ -z "$selected" ]; then
-            # User cancelled (Ctrl-C)
+            # User cancelled (Ctrl-C or q)
             echo ""
             echo -e "${YELLOW}What would you like to do?${NC}"
             echo -e "${GREEN}[N]${NC} Create new session"
@@ -348,10 +437,11 @@ echo ""
                     exit 0
                     ;;
             esac
+            continue
         fi
 
-        # Filter out any header or separator lines from selection
-        selected=$(echo "$selected" | grep -v "||header||header" | grep -v "||separator||separator" | grep -v "^$")
+        # Filter out blank lines and whitespace-only lines
+        selected=$(echo "$selected" | grep -v '^[[:space:]]*$')
 
         # If no valid sessions after filtering, go back to menu
         if [ -z "$selected" ]; then
@@ -471,29 +561,79 @@ show_action_menu() {
 # Attach to selected sessions
 attach_sessions() {
     local selected="$1"
-    local running_sessions=$(echo "$selected" | grep "|running$" || true)
 
-    if [ -z "$running_sessions" ]; then
-        echo -e "${RED}No running sessions selected${NC}"
+    # Check for killed sessions that need resurrection first
+    local killed_sessions=$(echo "$selected" | grep "|killed$" || true)
+    local running_sessions=$(echo "$selected" | grep -E "\|running$|\|attached$" || true)
+
+    # Resurrect any killed sessions first
+    if [ -n "$killed_sessions" ]; then
+        echo ""
+        echo -e "${YELLOW}⚙️  Resurrecting saved sessions first...${NC}"
+        echo ""
+
+        echo "$killed_sessions" | while IFS='|' read -r display session_name rest; do
+            session_name=$(echo "$session_name" | xargs)
+            echo -e "  ${CYAN}→${NC} Resurrecting: $session_name"
+            resurrect_session "$session_name"
+        done
+
+        echo ""
+        echo -e "${GREEN}✓ All saved sessions resurrected${NC}"
+        sleep 1
+    fi
+
+    # Now collect all sessions to attach (running + newly resurrected)
+    local all_sessions=""
+    echo "$selected" | while IFS='|' read -r display session_name rest; do
+        session_name=$(echo "$session_name" | xargs)
+        # Check if session is now running in tmux
+        if tmux has-session -t "$session_name" 2>/dev/null; then
+            echo "$session_name"
+        fi
+    done > /tmp/attach-sessions-list.$$
+
+    all_sessions=$(cat /tmp/attach-sessions-list.$$ 2>/dev/null || echo "")
+    rm -f /tmp/attach-sessions-list.$$
+
+    if [ -z "$all_sessions" ]; then
+        echo -e "${RED}No sessions available to attach${NC}"
         sleep 2
         return
     fi
 
-    local count=$(echo "$running_sessions" | wc -l)
+    local count=$(echo "$all_sessions" | wc -l | tr -d ' ')
 
     if [ "$count" -eq 1 ]; then
         # Single session - attach directly
-        local session_name=$(echo "$running_sessions" | cut -d'|' -f2)
-        session_name=$(echo "$session_name" | xargs)
-        echo -e "${GREEN}Attaching to: $session_name${NC}"
-        tmux attach -t "$session_name"
+        local session_name=$(echo "$all_sessions" | head -1 | xargs)
+        echo ""
+        echo -e "${GREEN}✓ Session ready: $session_name${NC}"
+        echo ""
+
+        # Check if we're in an interactive terminal
+        if [ -t 0 ] && [ -t 1 ]; then
+            echo -e "${CYAN}Attaching now...${NC}"
+            sleep 1
+            exec tmux attach -t "$session_name"
+        else
+            # Non-interactive - print manual attach command
+            echo -e "${YELLOW}Run this command to attach:${NC}"
+            echo -e "  ${CYAN}tmux attach -t $session_name${NC}"
+            echo ""
+            exit 0
+        fi
     else
-        # Multiple sessions - open in tabs (if iTerm) or attach to first
-        if [[ "${TERM_PROGRAM:-}" == "iTerm.app" ]]; then
-            echo -e "${GREEN}Opening $count sessions in new tabs...${NC}"
-            echo "$running_sessions" | while IFS='|' read -r display session_name rest; do
+        # Multiple sessions
+        echo ""
+        echo -e "${GREEN}✓ All sessions ready ($count total)${NC}"
+        echo ""
+
+        if [[ "${TERM_PROGRAM:-}" == "iTerm.app" ]] && [ -t 0 ]; then
+            echo -e "${CYAN}Opening in new tabs...${NC}"
+            echo "$all_sessions" | while read -r session_name; do
                 session_name=$(echo "$session_name" | xargs)
-                osascript <<EOF
+                osascript 2>/dev/null <<EOF
 tell application "iTerm"
     tell current window
         create tab with default profile command "tmux attach -t $session_name"
@@ -501,14 +641,20 @@ tell application "iTerm"
 end tell
 EOF
             done
-            sleep 1
+            echo ""
+            echo -e "${GREEN}✓ Opened in iTerm tabs${NC}"
+            sleep 2
         else
-            # Attach to first session only
-            local session_name=$(echo "$running_sessions" | head -1 | cut -d'|' -f2)
-            session_name=$(echo "$session_name" | xargs)
-            echo -e "${YELLOW}Multiple attach only works in iTerm2${NC}"
-            echo -e "${GREEN}Attaching to first: $session_name${NC}"
-            tmux attach -t "$session_name"
+            # Non-iTerm or non-interactive - show manual commands
+            echo -e "${YELLOW}To attach to sessions, run:${NC}"
+            echo ""
+            echo "$all_sessions" | while read -r session_name; do
+                session_name=$(echo "$session_name" | xargs)
+                echo -e "  ${CYAN}tmux attach -t $session_name${NC}"
+            done
+            echo ""
+            echo -e "${GRAY}Or use Ctrl-C to cancel and attach manually${NC}"
+            sleep 3
         fi
     fi
 }
@@ -516,22 +662,34 @@ EOF
 # Kill selected sessions
 kill_sessions() {
     local selected="$1"
-    local running_sessions=$(echo "$selected" | grep "|running$" || true)
+    local running_sessions=$(echo "$selected" | grep -E "\|running$|\|attached$" || true)
+    local killed_sessions=$(echo "$selected" | grep "|killed$" || true)
+
+    # Warn if some sessions are already killed
+    if [ -n "$killed_sessions" ]; then
+        local killed_count=$(echo "$killed_sessions" | wc -l | tr -d ' ')
+        echo ""
+        echo -e "${YELLOW}⚠️  Note: $killed_count session(s) already saved (will be skipped)${NC}"
+        sleep 1
+    fi
 
     if [ -z "$running_sessions" ]; then
-        echo -e "${RED}No running sessions selected${NC}"
+        echo ""
+        echo -e "${RED}No running sessions to kill${NC}"
         sleep 2
         return
     fi
 
+    echo ""
     echo "$running_sessions" | while IFS='|' read -r display session_name rest; do
         session_name=$(echo "$session_name" | xargs)
-        echo -e "${YELLOW}Saving and killing: $session_name${NC}"
+        echo -e "  ${YELLOW}→${NC} Saving and killing: $session_name"
         save_session_state "$session_name"
         tmux kill-session -t "$session_name" 2>/dev/null || true
     done
 
-    echo -e "${GREEN}✓ Sessions killed and saved${NC}"
+    echo ""
+    echo -e "${GREEN}✓ Running sessions killed and saved${NC}"
     sleep 2
 }
 
@@ -539,26 +697,66 @@ kill_sessions() {
 resurrect_sessions() {
     local selected="$1"
     local killed_sessions=$(echo "$selected" | grep "|killed$" || true)
+    local running_sessions=$(echo "$selected" | grep -E "\|running$|\|attached$" || true)
+
+    # Warn if some sessions are already running
+    if [ -n "$running_sessions" ]; then
+        local running_count=$(echo "$running_sessions" | wc -l | tr -d ' ')
+        echo ""
+        echo -e "${YELLOW}⚠️  Note: $running_count session(s) already running (will be skipped)${NC}"
+        sleep 1
+    fi
 
     if [ -z "$killed_sessions" ]; then
-        echo -e "${RED}No killed sessions selected${NC}"
+        echo ""
+        echo -e "${RED}No saved sessions to resurrect${NC}"
         sleep 2
         return
     fi
 
-    # For now, just resurrect the first one
-    local session_name=$(echo "$killed_sessions" | head -1 | cut -d'|' -f2)
-    session_name=$(echo "$session_name" | xargs)
-    resurrect_session "$session_name"
+    local count=$(echo "$killed_sessions" | wc -l | tr -d ' ')
+
+    if [ "$count" -eq 1 ]; then
+        # Single session - resurrect and attach
+        local session_name=$(echo "$killed_sessions" | head -1 | cut -d'|' -f2)
+        session_name=$(echo "$session_name" | xargs)
+        resurrect_session "$session_name"
+    else
+        # Multiple sessions - resurrect all
+        echo ""
+        echo -e "${GREEN}Resurrecting $count sessions...${NC}"
+        echo ""
+
+        echo "$killed_sessions" | while IFS='|' read -r display session_name rest; do
+            session_name=$(echo "$session_name" | xargs)
+            echo -e "  ${CYAN}→${NC} Resurrecting: $session_name"
+            resurrect_session "$session_name"
+        done
+
+        echo ""
+        echo -e "${GREEN}✓ All sessions resurrected${NC}"
+        sleep 2
+    fi
 }
 
 # Delete selected sessions permanently
 delete_sessions() {
     local selected="$1"
     local killed_sessions=$(echo "$selected" | grep "|killed$" || true)
+    local running_sessions=$(echo "$selected" | grep -E "\|running$|\|attached$" || true)
+
+    # Warn if some sessions are still running
+    if [ -n "$running_sessions" ]; then
+        local running_count=$(echo "$running_sessions" | wc -l | tr -d ' ')
+        echo ""
+        echo -e "${YELLOW}⚠️  Note: $running_count session(s) still running (cannot delete)${NC}"
+        echo -e "${YELLOW}    Kill them first to save their state${NC}"
+        sleep 1
+    fi
 
     if [ -z "$killed_sessions" ]; then
-        echo -e "${RED}No killed sessions selected${NC}"
+        echo ""
+        echo -e "${RED}No saved sessions to delete${NC}"
         sleep 2
         return
     fi
@@ -577,17 +775,23 @@ delete_sessions() {
         delete_session_state "$session_name"
     done
 
-    echo -e "${GREEN}✓ Sessions permanently deleted${NC}"
+    echo ""
+    echo -e "${GREEN}✓ Saved sessions permanently deleted${NC}"
     sleep 2
 }
 
-# Create a new session with file picker
+# Create a new session - fully integrated visual workflow
 create_new_session() {
+    clear
     echo ""
-    echo -e "${BLUE}Select project folder for new session${NC}"
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║              Create New Multi-Agent Session                   ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
     echo ""
 
-    # Use file picker to select project folder
+    # Step 1: Select project folder
+    echo -e "${BLUE}Step 1/4: Select project folder${NC}"
+    echo ""
     local project_path=$("$SCRIPT_DIR/file-picker.sh" folder)
 
     if [ -z "$project_path" ]; then
@@ -602,10 +806,145 @@ create_new_session() {
         return
     fi
 
-    echo -e "${GREEN}Selected: $project_path${NC}"
+    echo -e "${GREEN}✓ Selected: $project_path${NC}"
+    echo ""
 
-    # Export the path and delegate to main session creation script
+    # Step 2: Session name
+    echo -e "${BLUE}Step 2/4: Session name${NC}"
+    local session_name=""
+    while true; do
+        echo -en "${YELLOW}Session name (or press Enter for '$(basename "$project_path")'):${NC} "
+        read session_name || session_name=""
+        session_name=${session_name:-$(basename "$project_path")}
+
+        # Sanitize for tmux
+        local session_safe=$(echo "$session_name" | tr -cs 'A-Za-z0-9_-' '_' | tr '[:upper:]' '[:lower:]' | sed 's/^_*//;s/_*$//')
+
+        if [ -z "$session_safe" ]; then
+            echo -e "${RED}Error: Invalid session name${NC}"
+            continue
+        fi
+
+        # Check if session already exists
+        if tmux has-session -t "$session_safe" 2>/dev/null; then
+            echo -e "${YELLOW}Session '$session_safe' already exists${NC}"
+            echo -en "${YELLOW}Choose a different name? [Y/n]:${NC} "
+            read try_again || try_again=""
+            try_again=${try_again:-Y}
+            if [[ "$try_again" =~ ^[Yy]$ ]] || [ "$try_again" = "" ]; then
+                continue
+            else
+                return
+            fi
+        fi
+
+        if [ "$session_safe" != "$session_name" ]; then
+            echo -e "${YELLOW}Note: Normalized to '$session_safe'${NC}"
+        fi
+
+        break
+    done
+    echo -e "${GREEN}✓ Session name: $session_safe${NC}"
+    echo ""
+
+    # Step 3: Number of agents
+    echo -e "${BLUE}Step 3/4: Agent configuration${NC}"
+    echo -e "${YELLOW}💡 Tip: Start with 2 Claude agents if you're not sure${NC}"
+    echo ""
+
+    local claude_count=""
+    while true; do
+        echo -en "${YELLOW}Number of Claude agents (press Enter for 2):${NC} "
+        read claude_count || claude_count=""
+        claude_count=${claude_count:-2}
+
+        if [[ "$claude_count" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            echo -e "${RED}Error: Must be a number${NC}"
+        fi
+    done
+
+    local codex_count=""
+    while true; do
+        echo -en "${YELLOW}Number of Codex agents (press Enter for 0):${NC} "
+        read codex_count || codex_count=""
+        codex_count=${codex_count:-0}
+
+        if [[ "$codex_count" =~ ^[0-9]+$ ]]; then
+            break
+        else
+            echo -e "${RED}Error: Must be a number${NC}"
+        fi
+    done
+
+    local total_agents=$((claude_count + codex_count))
+
+    if [ "$total_agents" -eq 0 ]; then
+        echo -e "${RED}Error: Must have at least one agent${NC}"
+        sleep 2
+        return
+    fi
+
+    echo -e "${GREEN}✓ Agents: $claude_count Claude + $codex_count Codex = $total_agents total${NC}"
+    echo ""
+
+    # Step 4: Shared task list
+    echo -e "${BLUE}Step 4/4: Shared task list${NC}"
+    echo -e "${YELLOW}Shared task lists allow all agents to collaborate on the same tasks${NC}"
+    echo ""
+
+    local enable_shared=""
+    echo -en "${YELLOW}Enable shared task list? [y/N]:${NC} "
+    read enable_shared || enable_shared=""
+    enable_shared=${enable_shared:-N}
+
+    local task_list_id=""
+    if [[ "$enable_shared" =~ ^[Yy]$ ]]; then
+        echo -en "${YELLOW}Task list ID (press Enter for '${session_safe}-tasks'):${NC} "
+        read task_list_id || task_list_id=""
+        task_list_id=${task_list_id:-"${session_safe}-tasks"}
+        echo -e "${GREEN}✓ Shared task list: $task_list_id${NC}"
+    else
+        echo -e "${BLUE}Each agent will have its own task list${NC}"
+    fi
+    echo ""
+
+    # Confirm and create
+    echo -e "${BLUE}╔════════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║                    Ready to Create                            ║${NC}"
+    echo -e "${BLUE}╚════════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "  ${BLUE}Session:${NC}     $session_safe"
+    echo -e "  ${BLUE}Project:${NC}     $project_path"
+    echo -e "  ${BLUE}Agents:${NC}      $claude_count Claude + $codex_count Codex"
+    if [[ "$enable_shared" =~ ^[Yy]$ ]]; then
+        echo -e "  ${BLUE}Tasks:${NC}       Shared ($task_list_id)"
+    else
+        echo -e "  ${BLUE}Tasks:${NC}       Individual per agent"
+    fi
+    echo ""
+    echo -en "${YELLOW}Create session? [Y/n]:${NC} "
+    read confirm || confirm=""
+    confirm=${confirm:-Y}
+
+    if ! [[ "$confirm" =~ ^[Yy]$ ]] && [ "$confirm" != "" ]; then
+        echo -e "${YELLOW}Cancelled${NC}"
+        sleep 1
+        return
+    fi
+
+    # Export all parameters and call session creation script
     export SELECTED_PROJECT_PATH="$project_path"
+    export SKIP_EXISTING_SESSIONS_CHECK=1
+    export PRESET_SESSION_NAME="$session_safe"
+    export PRESET_CLAUDE_COUNT="$claude_count"
+    export PRESET_CODEX_COUNT="$codex_count"
+    export PRESET_ENABLE_SHARED_TASKS="$enable_shared"
+    export PRESET_TASK_LIST_ID="$task_list_id"
+
+    echo ""
+    echo -e "${GREEN}🚀 Creating session...${NC}"
     exec "$SCRIPT_DIR/start-multi-agent-session-v2.sh"
 }
 
