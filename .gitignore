@@ -14,3 +14,7 @@ workflows/
 
 # Local configs
 .tmux.conf.agent-flywheel
+
+# Agent mail and session state
+.beads/
+.session-state/
